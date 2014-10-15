@@ -53,6 +53,8 @@ import Function.Related as Related
 
 open import Relation.Nullary
 
+-- Words and sequences
+
 Word : Set
 Word = List Letter
 
@@ -61,10 +63,20 @@ Seq = List Word
 
 infix 4 _⊴_ _⊵∃_
 
+-- Homeomorphic embedding of words
+
 data _⊴_ : Word → Word → Set where
   ⊴-[]   : [] ⊴ []
   ⊴-drop : ∀ {v w a} → v ⊴ w → v ⊴ a ∷ w
   ⊴-keep : ∀ {v w a} → v ⊴ w → a ∷ v ⊴ a ∷ w
+
+-- [] is embeddable in any word.
+
+[]⊴ : ∀ w → [] ⊴ w
+[]⊴ [] = ⊴-[]
+[]⊴ (a ∷ w) = ⊴-drop ([]⊴ w)
+
+-- Good sequences
 
 data _⊵∃_ (v : Word) : Seq → Set where
   ⊵∃-now   : ∀ {w ws} (n : w ⊴ v) → v ⊵∃ w ∷ ws
@@ -74,32 +86,58 @@ data Good : Seq → Set where
   good-now   : ∀ {ws w} (n : w ⊵∃ ws) → Good (w ∷ ws)
   good-later : ∀ {ws w} (l : Good ws) → Good (w ∷ ws)
 
--- Bar
+-- Inductive bars (for sequences of words)
 
 data Bar : Seq → Set where
-  now   : ∀ {ws} → (n : Good ws) → Bar ws
-  later : ∀ {ws} → (l : ∀ w → Bar (w ∷ ws)) → Bar ws
+  now   : ∀ {ws} (n : Good ws) → Bar ws
+  later : ∀ {ws} (l : ∀ w → Bar (w ∷ ws)) → Bar ws
 
--- _//_ (fbar)
+module Illustrative-stuff where
 
-_//_ : ∀ {ℓ} {A : Set ℓ} (f : ℕ → A) (n : ℕ) → List A
-f // zero = []
-f // suc n = (f n) ∷ (f // n)
+  -- This is not used in the following, but shows how inductive bars
+  -- can be used in proofs.
 
--- barThm
+  -- Bar [] → ∀ ws → Bar ws
 
-good// : ∀ (f : ℕ → Word) (n : ℕ)→ Bar (f // n) →
-           ∃ λ m → Good (f // m)
-good// f n (now g) = n , g
-good// f n (later l) = good// f (suc n) (l (f n))
+  bar[]→∀bar-w : ∀ vs → Bar vs → ∀ w → Bar (w ∷ vs)
+  bar[]→∀bar-w vs (now n) w = now (good-later n)
+  bar[]→∀bar-w vs (later l) w = later (bar[]→∀bar-w (w ∷ vs) (l w))
 
--- []⊴
+  bar[]→∀bar-ws : ∀ vs → Bar vs → ∀ ws → Bar (ws ++ vs)
+  bar[]→∀bar-ws vs bar-vs [] = bar-vs
+  bar[]→∀bar-ws vs bar-vs (w ∷ ws) =
+    bar[]→∀bar-w (ws ++ vs) (bar[]→∀bar-ws vs bar-vs ws) w
 
-[]⊴ : ∀ w → [] ⊴ w
-[]⊴ [] = ⊴-[]
-[]⊴ (a ∷ w) = ⊴-drop ([]⊴ w)
+  bar[]→∀bar : Bar [] → ∀ ws → Bar ws
+  bar[]→∀bar bar[] ws =
+    subst Bar (++[]≡ ws) (bar[]→∀bar-ws [] bar[] ws)
+    where ++[]≡ : ∀ us → us ++ [] ≡ us
+          ++[]≡ [] = refl
+          ++[]≡ (u ∷ us) = cong (_∷_ u) (++[]≡ us)
 
+  -- f // n constructs the sequence f (n - 1) , ... , f 0 .
+
+  _//_ : ∀ {ℓ} {A : Set ℓ} (f : ℕ → A) (n : ℕ) → List A
+  f // zero = []
+  f // suc n = (f n) ∷ (f // n)
+
+  -- If Bar [] , then, eventually, (f // m) becomes good.
+
+  bar//→good// : ∀ (f : ℕ → Word) (n : ℕ)→ Bar (f // n) →
+    ∃ λ m → Good (f // m)
+  bar//→good// f n (now g) = n , g
+  bar//→good// f n (later l) =
+    bar//→good// f (suc n) (l (f n))
+
+  bar[]→good// : ∀ (f : ℕ → Word) → Bar [] →
+    ∃ λ m → Good (f // m)
+  bar[]→good// f bar[] =
+    bar//→good// f zero bar[]
+
+
+--
 -- prop1
+--
 
 bar[]∷ : ∀ ws → Bar([] ∷ ws)
 bar[]∷ ws = later (λ w → now (good-now (⊵∃-now ([]⊴ w))))
@@ -115,7 +153,9 @@ infix 4 _∈?_
 _∈?_ : (a : Letter) (as : List Letter) → Dec (a ∈ as)
 a ∈? as = any (_≟_ a) as
 
+--
 -- GoodW & BarW
+--
 
 data GoodW : List Letter → Set where
   goodW-now   : ∀ {as a} (a∈as : a ∈ as) → GoodW (a ∷ as)
@@ -170,35 +210,36 @@ get-++ s = subseq₁ s ++ subseq₂ s
 seq-at : ∀ {l} i (f : Folder l) → Seq
 seq-at i f = get-++ (lookup i f)
 
-
--- The following function adds a letter to each word in a word list.
--- (In a sense, this is "multiplication".)
-
-infixr 5 _∷∈_
-
-_∷∈_ : (a : Letter) (ws : List Word) → List Word
-a ∷∈ [] = []
-a ∷∈ (w ∷ ws) = (a ∷ w) ∷ a ∷∈ ws
-
-∷∈-++ : Slot → Seq
-∷∈-++ s = (first s ∷∈ subseq₁ s) ++ subseq₂ s
+--
+-- update-slot
+--
 
 update-slot : Word → Slot → Slot
 update-slot u s = first s , u ∷ subseq₁ s , subseq₂ s
 
 -- Seisenberger's `insert-folder`.
 
-update-folder : ∀ {l} (u : Word) (i : Fin l) (f : Folder l) → Folder l
+update-folder : ∀ {l} (u : Word) (i : Fin l) (f : Folder l) →
+  Folder l
 update-folder u i f =
   f [ i ]≔ update-slot u (lookup i f)
 
+-- extend-folder
+
+extend-folder : ∀ {l} (a : Letter) (u : Word) (us : Seq) (f : Folder l) →
+  Folder (suc l)
+extend-folder a u us f = (a , (u ∷ []) , us) ∷ f
+
+-- _∈firsts_
 
 infix 4 _∈firsts_
 
 _∈firsts_ : ∀ {l} (a : Letter) (f : Folder l) → Set
 a ∈firsts f = ∃ λ i →  a ≡ first (lookup i f)
 
+--
 -- Build-folder
+--
 
 data Build-folder : {l : ℕ} → Seq → Folder l → Set where
   bld-[] : Build-folder [] []
@@ -207,8 +248,11 @@ data Build-folder : {l : ℕ} → Seq → Folder l → Set where
     Build-folder ((a ∷ w) ∷ ws) (update-folder w (proj₁ a∈as) f)
   bld-∉ :  ∀ {a w ws l} (f : Folder l) (bld : Build-folder ws f) →
     (a∉f : ¬ a ∈firsts f) →
-    Build-folder ((a ∷ w) ∷ ws) ((a , (w ∷ []) , ws) ∷ f)
+    Build-folder ((a ∷ w) ∷ ws) (extend-folder a w ws f)
 
+--
+-- _∈firsts?_
+--
 
 ¬∈firsts[] : ∀ {a} → ¬ a ∈firsts []
 ¬∈firsts[] (() , _) 
@@ -238,7 +282,9 @@ upd→firsts w zero (s ∷ f) = refl
 upd→firsts w (suc i) (s ∷ f) =
   cong₂ _∷_ refl (upd→firsts w i f)
 
+--
 -- Bars
+--
 
 data Bars {l : ℕ} : Folder l → Set where
   bars-now   : ∀ {f} →
@@ -251,6 +297,7 @@ data Bars {l : ℕ} : Folder l → Set where
 --
 -- Subsequences
 -- (As in the case of _⊴_, this is a homeomorphic embedding).
+--
 
 infix 4 _⋐_
 
@@ -287,6 +334,21 @@ good-mono (⋐-keep vs⋐ws) (good-later good-vs) =
 -- "Division" of sequences
 --   (a ∷∈ us) ++ vs ≡ ws
 --
+-- The following function adds a letter to each word in a word list.
+-- (In a sense, this is "multiplication".)
+
+infixr 5 _∷∈_
+
+_∷∈_ : (a : Letter) (ws : List Word) → List Word
+a ∷∈ [] = []
+a ∷∈ (w ∷ ws) = (a ∷ w) ∷ a ∷∈ ws
+
+∷∈-++ : Slot → Seq
+∷∈-++ s = (first s ∷∈ subseq₁ s) ++ subseq₂ s
+
+--
+-- Good (us ++ vs) → Good ((a ∷∈ us) ++ vs)
+--
 
 ∷⊵∃ : ∀ {a w ws} → w ⊵∃ ws → a ∷ w ⊵∃ ws
 ∷⊵∃ (⊵∃-now n) = ⊵∃-now (⊴-drop n)
@@ -299,10 +361,6 @@ good-mono (⋐-keep vs⋐ws) (good-later good-vs) =
 ⊵∃-∷∈-++ a w (u ∷ us) vs (⊵∃-later a∷w⊵) =
   ⊵∃-later (⊵∃-∷∈-++ a w us vs a∷w⊵)
 
---
--- good-∷∈-++
---
-
 good-∷∈-++ : ∀ a us vs →
   Good (us ++ vs) → Good ((a ∷∈ us) ++ vs)
 good-∷∈-++ a [] vs good-[]++vs =
@@ -312,16 +370,20 @@ good-∷∈-++ a (u ∷ us) vs (good-now n) =
 good-∷∈-++ a (u ∷ us) vs (good-later good-us++vs) =
   good-later (good-∷∈-++ a us vs good-us++vs)
 
+-- 
 
-∈-firsts→any-first : ∀ {l} {f : Folder l} {a} →
+∈toList∘firsts→∈firsts : ∀ {l} {f : Folder l} {a} →
   a ∈ toList (firsts f) → a ∈firsts f
-∈-firsts→any-first {zero} ()
-∈-firsts→any-first {suc l} {s ∷ f} (here refl) =
+∈toList∘firsts→∈firsts {zero} ()
+∈toList∘firsts→∈firsts {suc l} {s ∷ f} (here refl) =
   zero , refl
-∈-firsts→any-first {suc l} {s ∷ f} (there h)
-  with ∈-firsts→any-first h
+∈toList∘firsts→∈firsts {suc l} {s ∷ f} (there h)
+  with ∈toList∘firsts→∈firsts h
 ... | i , a≡ = suc i , a≡
 
+--
+-- lookup i (update-folder u j f) ≡ if i ≡ j then ... else ...
+--
 
 upd-i≡j : ∀ {l} (f : Folder l) u i →
   lookup i (update-folder u i f) ≡ update-slot u (lookup i f)
@@ -339,6 +401,10 @@ upd-i≢j (s ∷ f) u (suc i) zero i≢j = refl
 upd-i≢j (s ∷ f) u (suc i) (suc j) suc-i≢suc-j =
   upd-i≢j f u i j (suc-i≢suc-j ∘ cong suc)
 
+--
+-- _≡_ is decidable for Fin n.
+-- (For some reason, this is not in the standard library...)
+--
 
 fin-suc-injective : ∀ {l} {m n : Fin l} → Fin.suc m ≡ Fin.suc n → m ≡ n
 fin-suc-injective refl = refl
@@ -352,6 +418,10 @@ suc m ≟Fin zero = no (λ ())
 suc m ≟Fin suc n with m ≟Fin n
 ... | yes m≡n = yes (cong suc m≡n)
 ... | no  m≢n = no (λ sm≡sn → m≢n (fin-suc-injective sm≡sn))
+
+--
+-- Build-folder ws f → (a , us , vs) ∈ f → (a ∷∈ us) ++ vs ⋐ ws
+--
 
 -- update-slot→⋐
 
@@ -413,6 +483,11 @@ update-slot→⋐ {w} {ws} s =
 --
 -- good∈folder→good
 --
+-- This lemma corresponds to Lemma 5.7i in Seisenberger's thesis
+-- (where it is just assumed to be true "by construction").
+-- However, writing out an accurate formalized proof does take
+-- some effort.
+--
 
 good∈folder→good : ∀ {ws} {l} {f : Folder l} →
   Build-folder ws f →
@@ -436,6 +511,13 @@ good∈folder→good {ws} {l} {f} bld i good-at-i =
     Good ws
     ∎
 
+
+--
+-- ∀ ws → Bar ws ⊎ All∷ ws
+--   If [] ∈ ws, then [] ⊴ w for any subsequent word w,
+--   otherwise, all w ∈ ws are not empty.
+--
+
 -- bar→bar∷
 
 bar→bar∷ : ∀ {w ws} → Bar ws → Bar (w ∷ ws)
@@ -457,7 +539,9 @@ bar⊎all∷ ws with all∷? ws
 ... | yes all∷ = inj₂ all∷
 ... | no ¬all∷ = inj₁ (¬all∷→bar ws ¬all∷)
 
+--
 -- build-folder→¬goodW
+--
 
 build-folder→¬goodW : ∀ {ws} {l} {f : Folder l} → Build-folder ws f →
   ¬ GoodW (toList (firsts f))
@@ -467,9 +551,13 @@ build-folder→¬goodW (bld-∈ {a} {w} f bld a∈as) goodW-f
   rewrite upd→firsts w (proj₁ a∈as) f
   = build-folder→¬goodW bld goodW-f
 build-folder→¬goodW (bld-∉ f bld a∉f) (goodW-now a∈as) =
-  a∉f (∈-firsts→any-first a∈as)
+  a∉f (∈toList∘firsts→∈firsts a∈as)
 build-folder→¬goodW (bld-∉ f bld a∉f) (goodW-later goodW-f) =
   build-folder→¬goodW bld goodW-f
+
+--
+-- Extending a folder with a new slot, while preserving the invariant `Bars f`.
+--
 
 mutual
 
@@ -497,7 +585,15 @@ mutual
     helper w (suc i) =
       bar∷bars₁ l-bar (l-bars w i)
 
+--
+-- Now we prove a generalization of Higman's lemma
+-- (which will be obtained by letting ws ≡ [] and f ≡ []).
+--
+
 mutual
+
+  -- If `[] ∈ ws`, we get `Bar ws` immediately.
+  -- Otherwise, we can turn `ws` into a folder.
 
   higman⊎ : ∀ ws {l} (f : Folder l) →
     Build-folder ws f → ∀ as → as ≡ toList (firsts f) →
@@ -506,6 +602,10 @@ mutual
   ... | inj₁ bar-ws = bar-ws
   ... | inj₂ all∷ =
     higman₀ ws f all∷ f-ws as as≡ barw-f bars-f
+
+  -- Let `as ≡ toList (firsts f)`.
+  -- `as` cannot be a good letter sequence (by construction of `f`).
+  -- Hence, `BarW as` implies `∀ a → BarW (a ∷ as)`.
 
   higman₀ : ∀ ws {l} (f : Folder l) → All∷ ws →
     Build-folder ws f → ∀ as → as ≡ toList (firsts f) →
@@ -516,6 +616,10 @@ mutual
   higman₀ ws f all∷ f-ws as as≡ (laterW l-f) bars-f =
     higman₁ ws f all∷ f-ws as as≡ l-f bars-f
 
+  -- If `Bars f` contains (a representation of) a good subsequence,
+  -- then ws is good. Hence, `Bar ws`.
+  -- Otherwise, `∀ u i → Bars (update-folder u i f)`.
+
   higman₁ : ∀ ws {l} (f : Folder l) → All∷ ws →
     Build-folder ws f → ∀ as → as ≡ toList (firsts f) →
     (∀ a → BarW (a ∷ as)) → Bars f → Bar ws
@@ -524,37 +628,57 @@ mutual
   higman₁ ws f all∷ f-ws as as≡ l-barw (bars-later l-bars) =
     later (λ w → higman₂ w ws f all∷ f-ws as as≡ l-barw l-bars)
 
+  -- Now `∀ a → BarW (a ∷ as)`, `∀ u i → Bars (update-folder u i f))` and
+  -- the word sequence *is not empty*.
+  -- Hence, let's do induction on the first word of the sequence.
+
   higman₂ : ∀ (w : Word) ws {l} (f : Folder l) → All∷ ws →
     Build-folder ws f → ∀ as → (as≡ : as ≡ toList (firsts f)) →
     (∀ a → BarW (a ∷ as)) →
     (∀ u i → Bars (update-folder u i f)) →
     Bar (w ∷ ws)
+
+  -- []. Bars ([] ∷ ws).
   higman₂ [] ws f all∷ f-ws as as≡ l-barw l-bars =
     bar[]∷ ws
+
+  -- a ∷ w.
   higman₂ (a ∷ w) ws f all∷ f-ws as as≡ l-barw l-bars
     with a ∈firsts? f
   ... | yes a∈as =
-    higman₁ ((a ∷ w) ∷ ws) f′ ((λ ()) ∷ all∷)
+    -- a ∈firsts f. f is updated to f′. So, `firsts f ≡ firsts f′`.
+    Bar ws′ ∋
+    higman₁ ws′ f′ ((λ ()) ∷ all∷)
             (bld-∈ f f-ws a∈as)
-            as as≡f-f′ l-barw (l-bars w i)
+            as as≡f-f′
+            l-barw ({- Bars f′ ∋ -} l-bars w i)
     where
-      open ≡-Reasoning
+      ws′ = (a ∷ w) ∷ ws
       i = proj₁ a∈as
       f′ = update-folder w i f
+      open ≡-Reasoning
       as≡f-f′ = begin
         as                ≡⟨ as≡ ⟩
         toList (firsts f) ≡⟨ cong toList (sym $ upd→firsts w i f) ⟩
         toList (firsts f′) ∎
   ... | no  a∉as =
-    higman₀ ((a ∷ w) ∷ ws) ((a , w ∷ [] , ws) ∷ f) ((λ ()) ∷ all∷)
+    -- a ∉firsts f. f is extended to f′. So, `a ∷ firsts f ≡ firsts f′` and
+    Bar ws′ ∋
+    higman₀ ws′ f′ ((λ ()) ∷ all∷)
             (bld-∉ f f-ws a∉as)
             (a ∷ as) (cong (_∷_ a) as≡)
-            (l-barw a)
-            (bar∷bars (higman₂ w ws f all∷ f-ws as as≡ l-barw l-bars)
-                      (bars-later l-bars))
+            ({- BarW (a ∷ as) ∋ -} l-barw a) bars-f′
+    where
+      ws′ = (a ∷ w) ∷ ws
+      f′ = extend-folder a w ws f
+      bar-w∷ws : Bar (w ∷ ws)
+      bar-w∷ws = higman₂ w ws f all∷ f-ws as as≡ l-barw l-bars
+      bars-f′ : Bars f′
+      bars-f′ = bar∷bars bar-w∷ws (bars-later l-bars)
 
-
+--
 -- bars[]
+--
 
 bars[] : Bars []
 bars[] = bars-later helper

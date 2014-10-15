@@ -17,3 +17,9 @@ This version is compatible with
 
 * Agda 2.4.2
 * The Standard Library 0.8.1
+
+Note that the formalization in Agda is complete. Namely, it contains
+a proof of the lemma **`good∈folder→good`**. This lemma corresponds to
+Lemma 5.7i in Seisenberger's thesis (where it is just assumed to be
+true "by construction"). However, writing out an accurate formalized
+proof does take some effort.
