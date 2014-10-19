@@ -430,12 +430,12 @@ update-slot→⋐ : ∀ {w ws} s →
     ∷∈-++ (update-slot w s) ⋐ (first s ∷ w) ∷ ws
 update-slot→⋐ {w} {ws} s =
   ∷∈-++ s ⋐ ws
-    ∼⟨ ⋐-keep ⟩
-  (a ∷ w) ∷ (∷∈-++ s) ⋐ (a ∷ w) ∷ ws
     ≡⟨ refl ⟩
+  (a ∷∈ us) ++ vs ⋐ ws
+    ∼⟨ ⋐-keep ⟩
   (a ∷ w) ∷ (a ∷∈ us) ++ vs ⋐ (a ∷ w) ∷ ws
     ≡⟨ refl ⟩
-  (a ∷∈ (w ∷ us)) ++ vs ⋐ (a ∷ w) ∷ ws
+  ((a ∷∈ w ∷ us) ++ vs) ⋐ (a ∷ w) ∷ ws
     ≡⟨ refl ⟩
   ∷∈-++ (a , w ∷ us , vs) ⋐ (a ∷ w) ∷ ws
     ≡⟨ refl ⟩
@@ -561,25 +561,25 @@ build-folder→¬goodW (bld-∉ f bld a∉f) (goodW-later goodW-f) =
 
 mutual
 
-  bar∷bars : ∀ {l} {f : Folder l} {a u us ws} →
-    Bar (u ∷ us ++ ws) → Bars f →
-    Bars ((a , (u ∷ us) , ws) ∷ f)
+  bar∷bars : ∀ {l} {f : Folder l} {a us ws} →
+    Bar (us ++ ws) → Bars f →
+    Bars ((a , us , ws) ∷ f)
 
-  bar∷bars (now good-v∷ws) bars-f =
-    bars-now zero good-v∷ws
+  bar∷bars (now good-us++ws) bars-f =
+    bars-now zero good-us++ws
   bar∷bars (later l-bar) bars-f =
     bar∷bars₁ l-bar bars-f
 
-  bar∷bars₁ : ∀ {l} {f : Folder l} {a u us ws} →
-    (∀ w → Bar (w ∷ u ∷ us ++ ws)) →
-    Bars f → Bars ((a , (u ∷ us) , ws) ∷ f)
+  bar∷bars₁ : ∀ {l} {f : Folder l} {a us ws} →
+    (∀ w → Bar (w ∷ us ++ ws)) →
+    Bars f → Bars ((a , us , ws) ∷ f)
 
   bar∷bars₁ l-bar (bars-now i good-at-i) =
     bars-now (suc i) good-at-i
-  bar∷bars₁ {l} {f} {a} {u} {us} {ws} l-bar (bars-later l-bars) =
+  bar∷bars₁ {l} {f} {a} {us} {ws} l-bar (bars-later l-bars) =
     bars-later helper
     where
-    helper : ∀ w i → Bars (update-folder w i ((a , u ∷ us , ws) ∷ f))
+    helper : ∀ w i → Bars (update-folder w i ((a , us , ws) ∷ f))
     helper w zero =
       bar∷bars (l-bar w) (bars-later l-bars)
     helper w (suc i) =
