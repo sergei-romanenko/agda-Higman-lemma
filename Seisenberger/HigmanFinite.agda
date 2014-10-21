@@ -207,8 +207,8 @@ firsts = Vec.map first
 get-++ : Slot → Seq
 get-++ s = subseq₁ s ++ subseq₂ s
 
-seq-at : ∀ {l} i (f : Folder l) → Seq
-seq-at i f = get-++ (lookup i f)
+++-at : ∀ {l} i (f : Folder l) → Seq
+++-at i f = get-++ (lookup i f)
 
 --
 -- update-slot
@@ -251,29 +251,38 @@ data Build-folder : {l : ℕ} → Seq → Folder l → Set where
     Build-folder ((a ∷ w) ∷ ws) (extend-folder a w ws f)
 
 --
+-- a ∈ toList (firsts f) ⇔ a ∈firsts f
+--
+
+∈toList∘firsts→∈firsts : ∀ {l} {f : Folder l} {a} →
+  a ∈ toList (firsts f) → a ∈firsts f
+∈toList∘firsts→∈firsts {zero} ()
+∈toList∘firsts→∈firsts {suc l} {s ∷ f} (here refl) =
+  zero , refl
+∈toList∘firsts→∈firsts {suc l} {s ∷ f} (there h)
+  with ∈toList∘firsts→∈firsts h
+... | i , a≡ = suc i , a≡
+
+∈firsts→∈toList∘firsts : ∀ {l} {f : Folder l} {a} →
+  a ∈firsts f → a ∈ toList (firsts f)
+∈firsts→∈toList∘firsts {zero} {[]} (() , a≡)
+∈firsts→∈toList∘firsts {suc l} {s ∷ f} (zero , a≡) =
+  here a≡
+∈firsts→∈toList∘firsts {suc n} {s ∷ f} (suc i , a≡) =
+  there (∈firsts→∈toList∘firsts {n} {f} (i , a≡))
+
+--
 -- _∈firsts?_
 --
 
-¬∈firsts[] : ∀ {a} → ¬ a ∈firsts []
-¬∈firsts[] (() , _) 
-
-¬∈firsts∷ : ∀ {l} {f : Folder l} {s} {a} →
-  a ≢ first s → ¬ a ∈firsts f →
-  ¬ ∃ (λ i → a ≡ first (lookup i (s ∷ f)))
-¬∈firsts∷ a≢ a∉f (zero , a≡) =
-  a≢ a≡
-¬∈firsts∷ a≢ a∉f (suc i , a≡) =
-  a∉f (i , a≡)
-
 _∈firsts?_ : ∀ {l} (a : Letter) (f : Folder l) → Dec (a ∈firsts f)
-a ∈firsts? [] = no ¬∈firsts[]
-a ∈firsts? (s ∷ f) with a ≟ first s
-... | yes a≡f-s = yes (zero , a≡f-s)
-... | no  a≢f-s with a ∈firsts? f
-... | yes (i , a≡f-i) =
-  yes (suc i , a≡f-i)
-... | no  a∉f =
-  no (¬∈firsts∷ a≢f-s a∉f)
+a ∈firsts? f with a ∈? toList (firsts f)
+... | yes a∈as = yes (∈toList∘firsts→∈firsts a∈as)
+... | no  a∉as = no (λ a∈f → a∉as (∈firsts→∈toList∘firsts a∈f))
+
+--
+-- firsts (update-folder w i f) ≡ firsts f
+--
 
 upd→firsts : ∀ w {l} i (f : Folder l) →
   firsts (update-folder w i f) ≡ firsts f
@@ -288,7 +297,7 @@ upd→firsts w (suc i) (s ∷ f) =
 
 data Bars {l : ℕ} : Folder l → Set where
   bars-now   : ∀ {f} →
-    ∀ i → Good (seq-at i f) →
+    ∀ i → Good (++-at i f) →
     Bars f
   bars-later : ∀ {f} →
     (l : ∀ u i → Bars (update-folder u i f)) →
@@ -369,17 +378,6 @@ good-∷∈-++ a (u ∷ us) vs (good-now n) =
   good-now (⊵∃-∷∈-++ a u us vs n)
 good-∷∈-++ a (u ∷ us) vs (good-later good-us++vs) =
   good-later (good-∷∈-++ a us vs good-us++vs)
-
--- 
-
-∈toList∘firsts→∈firsts : ∀ {l} {f : Folder l} {a} →
-  a ∈ toList (firsts f) → a ∈firsts f
-∈toList∘firsts→∈firsts {zero} ()
-∈toList∘firsts→∈firsts {suc l} {s ∷ f} (here refl) =
-  zero , refl
-∈toList∘firsts→∈firsts {suc l} {s ∷ f} (there h)
-  with ∈toList∘firsts→∈firsts h
-... | i , a≡ = suc i , a≡
 
 --
 -- lookup i (update-folder u j f) ≡ if i ≡ j then ... else ...
@@ -491,7 +489,7 @@ update-slot→⋐ {w} {ws} s =
 
 good∈folder→good : ∀ {ws} {l} {f : Folder l} →
   Build-folder ws f →
-  ∀ i → Good (seq-at i f) →
+  ∀ i → Good (++-at i f) →
   Good ws
 good∈folder→good {ws} {l} {f} bld i good-at-i =
   helper good-at-i
@@ -561,29 +559,29 @@ build-folder→¬goodW (bld-∉ f bld a∉f) (goodW-later goodW-f) =
 
 mutual
 
-  bar∷bars : ∀ {l} {f : Folder l} {a us ws} →
+  extend-bars : ∀ {l} {f : Folder l} {a us ws} →
     Bar (us ++ ws) → Bars f →
     Bars ((a , us , ws) ∷ f)
 
-  bar∷bars (now good-us++ws) bars-f =
+  extend-bars (now good-us++ws) bars-f =
     bars-now zero good-us++ws
-  bar∷bars (later l-bar) bars-f =
-    bar∷bars₁ l-bar bars-f
+  extend-bars (later l-bar) bars-f =
+    extend-bars₁ l-bar bars-f
 
-  bar∷bars₁ : ∀ {l} {f : Folder l} {a us ws} →
+  extend-bars₁ : ∀ {l} {f : Folder l} {a us ws} →
     (∀ w → Bar (w ∷ us ++ ws)) →
     Bars f → Bars ((a , us , ws) ∷ f)
 
-  bar∷bars₁ l-bar (bars-now i good-at-i) =
+  extend-bars₁ l-bar (bars-now i good-at-i) =
     bars-now (suc i) good-at-i
-  bar∷bars₁ {l} {f} {a} {us} {ws} l-bar (bars-later l-bars) =
+  extend-bars₁ {l} {f} {a} {us} {ws} l-bar (bars-later l-bars) =
     bars-later helper
     where
     helper : ∀ w i → Bars (update-folder w i ((a , us , ws) ∷ f))
     helper w zero =
-      bar∷bars (l-bar w) (bars-later l-bars)
+      extend-bars (l-bar w) (bars-later l-bars)
     helper w (suc i) =
-      bar∷bars₁ l-bar (l-bars w i)
+      extend-bars₁ l-bar (l-bars w i)
 
 --
 -- Now we prove a generalization of Higman's lemma
@@ -674,7 +672,7 @@ mutual
       bar-w∷ws : Bar (w ∷ ws)
       bar-w∷ws = higman₂ w ws f all∷ f-ws as as≡ l-barw l-bars
       bars-f′ : Bars f′
-      bars-f′ = bar∷bars bar-w∷ws (bars-later l-bars)
+      bars-f′ = extend-bars bar-w∷ws (bars-later l-bars)
 
 --
 -- bars[]
