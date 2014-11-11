@@ -215,9 +215,6 @@ slot-at (s ∷ f) (suc i) = slot-at f i
 get-++ : Slot → Seq
 get-++ s = subseq₁ s ++ subseq₂ s
 
-++-at : ∀ (f : Folder) (i : Fin (length f)) → Seq
-++-at f i = get-++ (slot-at f i)
-
 --
 -- update-slot
 --
@@ -258,7 +255,7 @@ data Build-folder : Seq → Folder → Set where
 
 data Bars : Folder → Set where
   bars-now   : ∀ {f} →
-    ∀ i → Good (++-at f i) →
+    ∀ i → Good (get-++ (slot-at f i)) →
     Bars f
   bars-later : ∀ {f} →
     (l : ∀ u i → Bars (update-folder u f i)) →
@@ -483,7 +480,7 @@ a∈→a≡ (s ∷ f) (there a∈) {suc i} si≡ =
 
 good∈folder→good : ∀ {ws f} →
   Build-folder ws f →
-  ∀ i → Good (++-at f i) →
+  ∀ i → Good (get-++ (slot-at f i)) →
   Good ws
 good∈folder→good {ws} {f} bld i good-at-i =
   helper good-at-i
@@ -551,24 +548,23 @@ build-folder→¬goodW (bld-∉ f bld a∉) (goodW-later goodW-f) =
 
 mutual
 
-  extend-bars : ∀ {f} {a us ws} →
-    Bar (us ++ ws) → Bars f →
-    Bars ((a , us , ws) ∷ f)
+  extend-bars : ∀ {s f} →
+    Bar (get-++ s) → Bars f →
+    Bars (s ∷ f)
 
-  extend-bars (now good-us++ws) bars-f =
-    bars-now zero good-us++ws
-  extend-bars (later l-var) bars-f =
-    extend-bars₁ l-var bars-f
+  extend-bars (now good-++) bars-f =
+    bars-now zero good-++
+  extend-bars (later l-bar) bars-f =
+    extend-bars₁ l-bar bars-f
 
-  extend-bars₁ : ∀ {f} {a us ws} →
-    (∀ w → Bar (w ∷ us ++ ws)) →
-    Bars f → Bars ((a , us , ws) ∷ f)
-
+  extend-bars₁ : ∀ {s f} →
+    (∀ w → Bar (w ∷ get-++ s)) → Bars f →
+    Bars (s ∷ f)
   extend-bars₁ l-bar (bars-now i good-at-i) =
     bars-now (suc i) good-at-i
-  extend-bars₁ {f} {a} {us} {vs} l-bar (bars-later l-bars) =
+  extend-bars₁ {s} {f} l-bar (bars-later l-bars) =
     bars-later helper
-    where helper : ∀ u i → Bars (update-folder u ((a , us , vs) ∷ f) i)
+    where helper : ∀ u i → Bars (update-folder u (s ∷ f) i)
           helper u zero =
             extend-bars (l-bar u) (bars-later l-bars)
           helper u (suc i) =
