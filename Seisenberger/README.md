@@ -23,3 +23,8 @@ a proof of the lemma **`good∈folder→good`**. This lemma corresponds to
 Lemma 5.7i in Seisenberger's thesis (where it is just assumed to be
 true "by construction"). However, writing out an accurate formalized
 proof does take some effort.
+
+The contents of files:
+
+* `HigmanFinite.agda`. Higman's lemma for a finite alphabet.
+* `HigmanFiniteExamples.agda`. Some illustrative stuff for `HigmanFinite.agda`.

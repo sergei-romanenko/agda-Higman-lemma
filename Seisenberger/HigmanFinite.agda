@@ -10,24 +10,22 @@ open import Relation.Nullary
 open import Relation.Binary.PropositionalEquality as P
   renaming([_] to ≡[_])
 
-{-
 module HigmanFinite
   (Letter : Set)
   (_≟_ : (a b : Letter) → Dec (a ≡ b))
   where
--}
 
+{-
 module HigmanFinite where
 
 postulate
   Letter : Set
   _≟_ : (a b : Letter) → Dec (a ≡ b)
+-}
 
 open import Level
   renaming (zero to lzero; suc to lsuc)
 
-open import Data.Bool
-  using (Bool; true; false)
 open import Data.Nat as Nat
   using (ℕ; zero; suc)
 open import Data.Fin as Fin
@@ -50,6 +48,33 @@ open import Function
 import Function.Related as Related
 
 open import Relation.Nullary
+
+--
+-- Membership
+--
+
+open Membership-≡
+
+infix 4 _∈?_
+
+_∈?_ : (a : Letter) (as : List Letter) → Dec (a ∈ as)
+a ∈? as = any (_≟_ a) as
+
+--
+-- GoodW: a sequence of letters is "good" if there is a repeated letter.
+--
+
+data GoodW : List Letter → Set where
+  goodW-now   : ∀ {as a} (a∈ : a ∈ as) → GoodW (a ∷ as)
+  goodW-later : ∀ {as a} (good-as : GoodW as) → GoodW (a ∷ as)
+
+--
+-- BarW: eventually any word becomes good.
+--
+
+data BarW : List Letter → Set where
+  nowW   : ∀ {as} (g : GoodW as) → BarW as
+  laterW : ∀ {as} (l : ∀ a → BarW(a ∷ as)) → BarW as
 
 -- Words and sequences
 
@@ -87,51 +112,8 @@ data Good : Seq → Set where
 -- Inductive bars (for sequences of words)
 
 data Bar : Seq → Set where
-  now   : ∀ {ws} (n : Good ws) → Bar ws
+  now   : ∀ {ws} (g : Good ws) → Bar ws
   later : ∀ {ws} (l : ∀ w → Bar (w ∷ ws)) → Bar ws
-
-module Illustrative-stuff where
-
-  -- This is not used in the following, but shows how inductive bars
-  -- can be used in proofs.
-
-  -- Bar [] → ∀ ws → Bar ws
-
-  bar[]→∀bar-w : ∀ vs → Bar vs → ∀ w → Bar (w ∷ vs)
-  bar[]→∀bar-w vs (now n) w = now (good-later n)
-  bar[]→∀bar-w vs (later l) w = later (bar[]→∀bar-w (w ∷ vs) (l w))
-
-  bar[]→∀bar-ws : ∀ vs → Bar vs → ∀ ws → Bar (ws ++ vs)
-  bar[]→∀bar-ws vs bar-vs [] = bar-vs
-  bar[]→∀bar-ws vs bar-vs (w ∷ ws) =
-    bar[]→∀bar-w (ws ++ vs) (bar[]→∀bar-ws vs bar-vs ws) w
-
-  bar[]→∀bar : Bar [] → ∀ ws → Bar ws
-  bar[]→∀bar bar[] ws =
-    subst Bar (++[]≡ ws) (bar[]→∀bar-ws [] bar[] ws)
-    where ++[]≡ : ∀ us → us ++ [] ≡ us
-          ++[]≡ [] = refl
-          ++[]≡ (u ∷ us) = cong (_∷_ u) (++[]≡ us)
-
-  -- f // n constructs the sequence f (n - 1) , ... , f 0 .
-
-  _//_ : ∀ {ℓ} {A : Set ℓ} (f : ℕ → A) (n : ℕ) → List A
-  f // zero = []
-  f // suc n = (f n) ∷ (f // n)
-
-  -- If Bar [] , then, eventually, (f // m) becomes good.
-
-  bar//→good// : ∀ (f : ℕ → Word) (n : ℕ)→ Bar (f // n) →
-    ∃ λ m → Good (f // m)
-  bar//→good// f n (now g) = n , g
-  bar//→good// f n (later l) =
-    bar//→good// f (suc n) (l (f n))
-
-  bar[]→good// : ∀ (f : ℕ → Word) → Bar [] →
-    ∃ λ m → Good (f // m)
-  bar[]→good// f bar[] =
-    bar//→good// f zero bar[]
-
 
 --
 -- prop1
@@ -139,30 +121,6 @@ module Illustrative-stuff where
 
 bar[]∷ : ∀ ws → Bar([] ∷ ws)
 bar[]∷ ws = later (λ w → now (good-now (⊵∃-now ([]⊴ w))))
-
---
--- Membership
---
-
-open Membership-≡
-
-infix 4 _∈?_
-
-_∈?_ : (a : Letter) (as : List Letter) → Dec (a ∈ as)
-a ∈? as = any (_≟_ a) as
-
---
--- GoodW & BarW
---
-
-data GoodW : List Letter → Set where
-  goodW-now   : ∀ {as a} (a∈ : a ∈ as) → GoodW (a ∷ as)
-  goodW-later : ∀ {as a} (goodW-as : GoodW as) → GoodW (a ∷ as)
-
-
-data BarW : List Letter → Set where
-  nowW   : ∀ {as} (g : GoodW as) → BarW as
-  laterW : ∀ {as} (l : ∀ a → BarW(a ∷ as)) → BarW as
 
 --
 -- Non-empty lists
@@ -318,13 +276,13 @@ a ∷∈ (w ∷ ws) = (a ∷ w) ∷ a ∷∈ ws
 --
 
 ∷⊵∃ : ∀ {a w ws} → w ⊵∃ ws → a ∷ w ⊵∃ ws
-∷⊵∃ (⊵∃-now n) = ⊵∃-now (⊴-drop n)
+∷⊵∃ (⊵∃-now g) = ⊵∃-now (⊴-drop g)
 ∷⊵∃ (⊵∃-later l) = ⊵∃-later (∷⊵∃ l)
 
 ⊵∃-∷∈-++ : ∀ a w us vs →
   w ⊵∃ us ++ vs → a ∷ w ⊵∃ (a ∷∈ us) ++ vs
 ⊵∃-∷∈-++ a w [] vs w⊵∃vs = ∷⊵∃ w⊵∃vs
-⊵∃-∷∈-++ a w (u ∷ us) vs (⊵∃-now n) = ⊵∃-now (⊴-keep n)
+⊵∃-∷∈-++ a w (u ∷ us) vs (⊵∃-now g) = ⊵∃-now (⊴-keep g)
 ⊵∃-∷∈-++ a w (u ∷ us) vs (⊵∃-later a∷w⊵) =
   ⊵∃-later (⊵∃-∷∈-++ a w us vs a∷w⊵)
 
@@ -332,8 +290,8 @@ good-∷∈-++ : ∀ a us vs →
   Good (us ++ vs) → Good ((a ∷∈ us) ++ vs)
 good-∷∈-++ a [] vs good-[]++vs =
   good-[]++vs
-good-∷∈-++ a (u ∷ us) vs (good-now n) =
-  good-now (⊵∃-∷∈-++ a u us vs n)
+good-∷∈-++ a (u ∷ us) vs (good-now g) =
+  good-now (⊵∃-∷∈-++ a u us vs g)
 good-∷∈-++ a (u ∷ us) vs (good-later good-us++vs) =
   good-later (good-∷∈-++ a us vs good-us++vs)
 
@@ -595,11 +553,11 @@ mutual
   higman₀ : ∀ ws f → All∷ ws →
     Build-folder ws f → ∀ as → as ≡ firsts f →
     BarW as → Bars f → Bar ws
-  higman₀ ws f all∷ bld as as≡ (nowW goodW-as) bars-f
+  higman₀ ws f all∷ bld as as≡ (nowW good-as) bars-f
     rewrite as≡
-    = ⊥-elim (build-folder→¬goodW bld goodW-as)
-  higman₀ ws f all∷ bld as as≡ (laterW l-f) bars-f =
-    higman₁ ws f all∷ bld as as≡ l-f bars-f
+    = ⊥-elim (build-folder→¬goodW bld good-as)
+  higman₀ ws f all∷ bld as as≡ (laterW l-barw) bars-f =
+    higman₁ ws f all∷ bld as as≡ l-barw bars-f
 
   -- If `Bars f` contains (a representation of) a good subsequence,
   -- then ws is good. Hence, `Bar ws`.
@@ -608,7 +566,7 @@ mutual
   higman₁ : ∀ ws f → All∷ ws →
     Build-folder ws f → ∀ as → as ≡ firsts f →
     (∀ a → BarW (a ∷ as)) → Bars f → Bar ws
-  higman₁ ws f all∷ bld as as≡ l-f (bars-now a∈ good-at-i) =
+  higman₁ ws f all∷ bld as as≡ l-barw (bars-now a∈ good-at-i) =
     now (good∈folder→good bld a∈ good-at-i)
   higman₁ ws f all∷ bld as as≡ l-barw (bars-later l-bars) =
     later (λ w → higman₂ w ws f all∷ bld as as≡ l-barw l-bars)
@@ -636,7 +594,7 @@ mutual
     higman₁ ws′ f′ ((λ ()) ∷ all∷)
             (bld-∈ f bld a∈as)
             as as≡as′
-            l-barw ({- Bars f′ ∋ -} l-bars w (∈index a∈as))
+            l-barw (l-bars w (∈index a∈as))
     where
       ws′ = (a ∷ w) ∷ ws
       f′ = update-folder w f (∈index a∈as)
@@ -649,7 +607,7 @@ mutual
     higman₀ ws′ f′ ((λ ()) ∷ all∷)
             (bld-∉ f bld a∉as)
             (a ∷ as) (cong (_∷_ a) as≡)
-            ({- BarW (a ∷ as) ∋ -} l-barw a) bars-f′
+            (l-barw a) bars-f′
     where
       ws′ = (a ∷ w) ∷ ws
       f′ = extend-folder f a w ws
