@@ -1,9 +1,5 @@
 -- An inductive proof of Higman's Lemma for a finite alphabet
 
---
--- This version tries to use relations instead of functions.
---
-
 open import Relation.Nullary
   using (Dec; yes; no)
 
@@ -26,9 +22,6 @@ postulate
 open import Level
   renaming (zero to lzero; suc to lsuc)
 
-open import Data.Nat as Nat
-  using (ℕ; zero; suc)
-open import Data.Fin as Fin
 open import Data.List as List
   hiding (any; all)
 open import Data.List.All as All
@@ -36,13 +29,11 @@ open import Data.List.All as All
 open import Data.List.Any as Any
   using (Any; here; there; any; index; module Membership; module Membership-≡)
 open import Data.Product as Prod
-  using (_×_; _,_; proj₁; proj₂; Σ; ∃; ∃₂; uncurry)
+  using (_×_; _,_; proj₁; proj₂; Σ)
 open import Data.Sum as Sum
   using (_⊎_; inj₁; inj₂)
 open import Data.Empty
   using(⊥; ⊥-elim)
-open import Data.Unit
-  using (⊤; tt)
 
 open import Function
 import Function.Related as Related
@@ -167,34 +158,24 @@ Folder = List Slot
 labels : Folder → List Letter
 labels = map label
 
-∈index : ∀ {f : Folder} {a} (a∈ : a ∈ labels f) → Fin (length f)
-∈index {[]} ()
-∈index {s ∷ f} (here a≡) = zero
-∈index {s ∷ f} (there a∈) = suc (∈index a∈)
-
-slot-at : ∀ (f : Folder) (i : Fin (length f)) → Slot
-slot-at [] ()
-slot-at (s ∷ f) zero = s
-slot-at (s ∷ f) (suc i) = slot-at f i
-
-get-++ : Slot → Seq
-get-++ s = seq₁ s ++ seq₂ s
+seq₁++seq₂ : Slot → Seq
+seq₁++seq₂ s = seq₁ s ++ seq₂ s
 
 --
 -- update-slot
 --
 
-update-slot : Word → Slot → Slot
-update-slot u s = label s , u ∷ seq₁ s , seq₂ s
+update-slot : Slot → Word → Slot
+update-slot s u = label s , u ∷ seq₁ s , seq₂ s
 
 -- Seisenberger's `insert-folder`.
 
-update-folder : ∀ (u : Word) (f : Folder) (i : Fin (length f)) → Folder
-update-folder u [] ()
-update-folder u (s ∷ f) zero =
-  update-slot u s ∷ f
-update-folder u (s ∷ f) (suc i) =
-  s ∷ update-folder u f i
+update-folder : ∀ f (u : Word) {a} (a∈ : a ∈ labels f) → Folder
+update-folder [] u ()
+update-folder (s ∷ f) u (here a≡) =
+  update-slot s u ∷ f
+update-folder (s ∷ f) u (there a∈) =
+  s ∷ update-folder f u a∈
 
 -- extend-folder
 
@@ -204,12 +185,14 @@ extend-folder f a u vs = (a , (u ∷ []) , vs) ∷ f
 --
 -- Build-folder
 --
+-- Here Seisenberger defines a function, but we use a relation.
+--
 
 data Build-folder : Seq → Folder → Set where
   bld-[] : Build-folder [] []
   bld-∈ : ∀ {a w ws} f (bld : Build-folder ws f)
     (a∈ : a ∈ labels f) →
-    Build-folder ((a ∷ w) ∷ ws) (update-folder w f (∈index a∈))
+    Build-folder ((a ∷ w) ∷ ws) (update-folder f w a∈)
   bld-∉ : ∀ {a w ws} f (bld : Build-folder ws f) →
     (a∉ : ¬ a ∈ labels f) →
     Build-folder ((a ∷ w) ∷ ws) (extend-folder f a w ws)
@@ -219,11 +202,11 @@ data Build-folder : Seq → Folder → Set where
 --
 
 data Bars : Folder → Set where
-  bars-now   : ∀ {f} →
-    ∀ i → Good (get-++ (slot-at f i)) →
+  bars-now   : ∀ {f s} →
+    s ∈ f → Good (seq₁++seq₂ s) →
     Bars f
   bars-later : ∀ {f} →
-    (l : ∀ u i → Bars (update-folder u f i)) →
+    (l : ∀ u {a} (a∈ : a ∈ labels f) → Bars (update-folder f u a∈)) →
     Bars f
 
 --
@@ -304,135 +287,49 @@ good-∷∈-++ a (u ∷ us) vs (good-later good-us++vs) =
 
 -- labels (update-folder w i f) ≡ labels f
 
-upd→labels : ∀ w f i →
-  labels (update-folder w f i) ≡ labels f
-upd→labels w [] ()
-upd→labels w (s ∷ f) zero = refl
-upd→labels w (s ∷ f) (suc i) =
-  cong₂ _∷_ refl (upd→labels w f i)
+upd→labels : ∀ f u {a} a∈ →
+  labels (update-folder f u {a} a∈) ≡ labels f
+upd→labels [] u ()
+upd→labels (s ∷ f) u (here refl) =
+  refl
+upd→labels (s ∷ f) u (there a∈) =
+  cong₂ _∷_ refl (upd→labels f u a∈)
 
 --
--- _≡_ is decidable for Fin n.
--- (For some reason, this is not in the standard library...)
+-- Now we are going to prove a subtle fact:
+-- if there is a slot `(a , us , vs)` such that `Good (us ++ vs)`,
+-- then `Good ws`.
 --
 
-fin-suc-injective : ∀ {l} {m n : Fin l} → Fin.suc m ≡ Fin.suc n → m ≡ n
-fin-suc-injective refl = refl
-
-
-infix 4 _≟Fin_
-
-_≟Fin_ : ∀ {l} (m n : Fin l) → Dec (m ≡ n)
-zero ≟Fin zero = yes refl
-zero ≟Fin suc n = no (λ ())
-suc m ≟Fin zero = no (λ ())
-suc m ≟Fin suc n with m ≟Fin n
-... | yes m≡n = yes (cong suc m≡n)
-... | no  m≢n = no (λ sm≡sn → m≢n (fin-suc-injective sm≡sn))
-
--- index↓
-
-index↓ : ∀ u f (i : Fin (length f)) (j : Fin (length (update-folder u f i))) →
-           Fin (length f)
-index↓ u [] () j
-index↓ u (s ∷ f) zero j = j
-index↓ u (s ∷ f) (suc i) zero = zero
-index↓ u (s ∷ f) (suc i) (suc j) =
-  suc (index↓ u f i j)
-
---
--- slot-at (update-folder f u i) j ≡ if i ≡ j then ... else ...
---
-
-upd-≡ : ∀ u f i j → i ≡ index↓ u f i j →
-  slot-at (update-folder u f i) j ≡ update-slot u (slot-at f i)
-upd-≡ u [] () j i≡j
-upd-≡ u (s ∷ f) zero .zero refl = refl
-upd-≡ u (s ∷ f) (suc i) zero ()
-upd-≡ u (s ∷ f) (suc i) (suc j) si≡sj =
-  upd-≡ u f i j (fin-suc-injective si≡sj)
-
-upd-≢ : ∀ u f i j → i ≢ index↓ u f i j →
-  slot-at (update-folder u f i) j ≡ slot-at f (index↓ u f i j)
-upd-≢ u [] () j i≢j
-upd-≢ u (s ∷ f) zero zero 0≢0 = ⊥-elim (0≢0 refl)
-upd-≢ u (s ∷ f) zero (suc j) i≢j = refl
-upd-≢ u (s ∷ f) (suc i) zero i≢j = refl
-upd-≢ u (s ∷ f) (suc i) (suc j) si≢sj =
-  upd-≢ u f i j (si≢sj ∘ cong suc)
-
---
--- Build-folder ws f → (a , us , vs) ∈ f → (a ∷∈ us) ++ vs ⋐ ws
---
-
--- update-slot→⋐
-
-update-slot→⋐ : ∀ {w ws} s →
-  ∷∈-++ s ⋐ ws →
-    ∷∈-++ (update-slot w s) ⋐ (label s ∷ w) ∷ ws
-update-slot→⋐ {w} {ws} s =
-  ∷∈-++ s ⋐ ws
-    ≡⟨ refl ⟩
-  (a ∷∈ us) ++ vs ⋐ ws
-    ∼⟨ ⋐-keep ⟩
-  (a ∷ w) ∷ (a ∷∈ us) ++ vs ⋐ (a ∷ w) ∷ ws
-    ≡⟨ refl ⟩
-  ((a ∷∈ w ∷ us) ++ vs) ⋐ (a ∷ w) ∷ ws
-    ≡⟨ refl ⟩
-  ∷∈-++ (a , w ∷ us , vs) ⋐ (a ∷ w) ∷ ws
-    ≡⟨ refl ⟩
-  ∷∈-++ (update-slot w s) ⋐ (label s ∷ w) ∷ ws
-  ∎
-  where
-  open Related.EquationalReasoning
-  a = label s; us = seq₁ s; vs = seq₂ s
-
-
--- (a∈ : a ∈ labels f) → a ≡ label (slot-at f (∈index a∈))
-
-a∈→a≡ : ∀ f {a} (a∈ : a ∈ labels f)
-          {i} (i≡ : i ≡ ∈index a∈) → a ≡ label (slot-at f i)
-a∈→a≡ [] () i≡
-a∈→a≡ (s ∷ f) (here a≡) refl = a≡
-a∈→a≡ (s ∷ f) (there a∈) {zero} ()
-a∈→a≡ (s ∷ f) (there a∈) {suc i} si≡ =
-  a∈→a≡ f a∈ (fin-suc-injective si≡)
+⋐-upd : ∀ {f ws a u} →
+  (a∈ : a ∈ labels f) →
+  (∀ {s} → s ∈ f → ∷∈-++ s ⋐ ws) →
+  ∀ {s} → s ∈ update-folder f u a∈ → (∷∈-++ s) ⋐ ((a ∷ u) ∷ ws)
+⋐-upd {[]} () hf s∈
+⋐-upd {s ∷ f} (here refl) hf (here refl) =
+  ⋐-keep (hf (here refl))
+⋐-upd {s ∷ f} (here refl) hf (there s∈) =
+  ⋐-drop (hf (there s∈))
+⋐-upd {s ∷ f} (there a∈) hf (here refl) =
+  ⋐-drop (hf (here refl))
+⋐-upd {s ∷ f} (there a∈) hf (there s∈) =
+  ⋐-upd a∈ (λ s′∈f → hf (there s′∈f)) s∈
 
 --
 -- ∷∈-++-⋐
 --
 
-∷∈-++-⋐ : ∀ ws {f} →
+∷∈-++-⋐ : ∀ {ws f} →
   Build-folder ws f →
-  ∀ (j : Fin (length f)) →
-  ∷∈-++ (slot-at f j) ⋐ ws
+  ∀ {s} → s ∈ f → ∷∈-++ s ⋐ ws
 
-∷∈-++-⋐ [] bld-[] ()
-∷∈-++-⋐ ([] ∷ ws) () i
-
-∷∈-++-⋐ ((a ∷ w) ∷ ws) (bld-∈ {.a} f bld a∈) j
-  with ∈index a∈ | inspect ∈index a∈
-... | i | ≡[ ≡i ] with i ≟Fin (index↓ w f i j)
-... | yes i≡j rewrite upd-≡ w f i j i≡j | a∈→a≡ f a∈ (sym $ ≡i)
-  = update-slot→⋐ s ih
-  where
-  s = slot-at f i
-  ih : ∷∈-++ s ⋐ ws
-  ih = ∷∈-++-⋐ ws bld i
-... | no  i≢j rewrite upd-≢ w f i j i≢j
-  = is ih
-  where
-  open Related.EquationalReasoning
-  j↓ = index↓ w f i j
-  s = slot-at f j↓
-  ih : ∷∈-++ s ⋐ ws
-  ih = ∷∈-++-⋐ ws bld j↓
-  is = ∷∈-++ s ⋐ ws ∼⟨ ⋐-drop ⟩ ∷∈-++ s ⋐ (a ∷ w) ∷ ws ∎
-
-∷∈-++-⋐ ((a ∷ w) ∷ ws) (bld-∉ f bld a∉) zero =
-  (a ∷ w) ∷ ws ⋐ (a ∷ w) ∷ ws ∋ ⋐-refl
-∷∈-++-⋐ ((a ∷ w) ∷ ws) (bld-∉ f bld a∉) (suc i) =
-  ∷∈-++ (slot-at f i) ⋐ (a ∷ w) ∷ ws ∋ ⋐-drop (∷∈-++-⋐ ws bld i)
+∷∈-++-⋐ bld-[] ()
+∷∈-++-⋐ (bld-∈ f bld a∈) {s} s∈f =
+  ⋐-upd a∈ (∷∈-++-⋐ bld) s∈f
+∷∈-++-⋐ (bld-∉ f bld a∉) (here refl) =
+  ⋐-refl
+∷∈-++-⋐ (bld-∉ f bld a∉) {s} (there s∈f) =
+  ⋐-drop (∷∈-++-⋐ bld s∈f)
 
 --
 -- good∈folder→good
@@ -445,17 +342,16 @@ a∈→a≡ (s ∷ f) (there a∈) {suc i} si≡ =
 
 good∈folder→good : ∀ {ws f} →
   Build-folder ws f →
-  ∀ i → Good (get-++ (slot-at f i)) →
+  ∀ {s} → s ∈ f → Good (seq₁++seq₂ s) →
   Good ws
-good∈folder→good {ws} {f} bld i good-at-i =
-  helper good-at-i
+good∈folder→good {ws} {f} bld {s} s∈f good-s =
+  helper good-s
   where
   open Related.EquationalReasoning
-  s = slot-at f i
   a = label s; us = seq₁ s; vs = seq₂ s
 
   [a∷∈us]++vs⋐ws : (a ∷∈ us) ++ vs ⋐ ws
-  [a∷∈us]++vs⋐ws = ∷∈-++-⋐ ws bld i
+  [a∷∈us]++vs⋐ws = ∷∈-++-⋐ bld s∈f
   
   helper =
     Good (us ++ vs)
@@ -466,46 +362,19 @@ good∈folder→good {ws} {f} bld i good-at-i =
     ∎
 
 --
--- ∀ ws → Bar ws ⊎ All∷ ws
---   If [] ∈ ws, then [] ⊴ w for any subsequent word w,
---   otherwise, all w ∈ ws are not empty.
+-- bld→¬goodW
 --
 
--- bar→bar∷
-
-bar→bar∷ : ∀ {w ws} → Bar ws → Bar (w ∷ ws)
-bar→bar∷ (now g) = now (good-later g)
-bar→bar∷ {w} (later l) = l w
-
--- ¬all∷→bar
-
-¬all∷→bar : ∀ ws → ¬ All∷ ws → Bar ws
-¬all∷→bar [] ¬all∷ = ⊥-elim (¬all∷ [])
-¬all∷→bar ([] ∷ ws) ¬all∷ = bar[]∷ ws
-¬all∷→bar ((a ∷ w) ∷ ws) ¬all∷ =
-  bar→bar∷ (¬all∷→bar ws (λ z → ¬all∷ ((λ ()) ∷ z)))
-
--- bar⊎all∷
-
-bar⊎all∷ : ∀ ws → Bar ws ⊎ All∷ ws
-bar⊎all∷ ws with all∷? ws
-... | yes all∷ = inj₂ all∷
-... | no ¬all∷ = inj₁ (¬all∷→bar ws ¬all∷)
-
---
--- build-folder→¬goodW
---
-
-build-folder→¬goodW : ∀ {ws f} → Build-folder ws f →
+bld→¬goodW : ∀ {ws f} → Build-folder ws f →
   ¬ GoodW (labels f)
-build-folder→¬goodW bld-[] ()
-build-folder→¬goodW (bld-∈ {a} {w} f bld a∈) goodW-f
-  rewrite upd→labels w f (∈index a∈)
-  = build-folder→¬goodW bld goodW-f
-build-folder→¬goodW (bld-∉ f bld a∉) (goodW-now a∈) =
+bld→¬goodW bld-[] ()
+bld→¬goodW (bld-∈ {a} {w} f bld a∈) goodW-f
+  rewrite upd→labels f w a∈
+  = bld→¬goodW bld goodW-f
+bld→¬goodW (bld-∉ f bld a∉) (goodW-now a∈) =
   ⊥-elim (a∉ a∈)
-build-folder→¬goodW (bld-∉ f bld a∉) (goodW-later goodW-f) =
-  build-folder→¬goodW bld goodW-f
+bld→¬goodW (bld-∉ f bld a∉) (goodW-later goodW-f) =
+  bld→¬goodW bld goodW-f
 
 --
 -- Extending a folder with a new slot, while preserving the invariant `Bars f`.
@@ -514,26 +383,26 @@ build-folder→¬goodW (bld-∉ f bld a∉) (goodW-later goodW-f) =
 mutual
 
   extend-bars : ∀ {s f} →
-    Bar (get-++ s) → Bars f →
+    Bar (seq₁++seq₂ s) → Bars f →
     Bars (s ∷ f)
 
   extend-bars (now good-++) bars-f =
-    bars-now zero good-++
+    bars-now (here refl) good-++
   extend-bars (later l-bar) bars-f =
     extend-bars₁ l-bar bars-f
 
   extend-bars₁ : ∀ {s f} →
-    (∀ w → Bar (w ∷ get-++ s)) → Bars f →
+    (∀ w → Bar (w ∷ seq₁++seq₂ s)) → Bars f →
     Bars (s ∷ f)
-  extend-bars₁ l-bar (bars-now i good-at-i) =
-    bars-now (suc i) good-at-i
+  extend-bars₁ l-bar (bars-now s∈f good-s) =
+    bars-now (there s∈f) good-s
   extend-bars₁ {s} {f} l-bar (bars-later l-bars) =
     bars-later helper
-    where helper : ∀ u i → Bars (update-folder u (s ∷ f) i)
-          helper u zero =
+    where helper : ∀ u {a} a∈ → Bars (update-folder (s ∷ f) u a∈)
+          helper u (here a≡) =
             extend-bars (l-bar u) (bars-later l-bars)
-          helper u (suc i) =
-            extend-bars₁ l-bar (l-bars u i)
+          helper u (there a∈) =
+            extend-bars₁ l-bar (l-bars u a∈)
 
 --
 -- Now we prove a generalization of Higman's lemma
@@ -541,17 +410,6 @@ mutual
 --
 
 mutual
-
-  -- If `[] ∈ ws`, we get `Bar ws` immediately.
-  -- Otherwise, we can turn `ws` into a folder.
-
-  higman⊎ : ∀ ws f →
-    Build-folder ws f → ∀ as → as ≡ labels f →
-    BarW as → Bars f → Bar ws
-  higman⊎ ws f bld as as≡ barw-f bars-f with bar⊎all∷ ws
-  ... | inj₁ bar-ws = bar-ws
-  ... | inj₂ all∷ =
-    higman₀ ws f all∷ bld as as≡ barw-f bars-f
 
   -- Let `as ≡ labels f`.
   -- `as` cannot be a good letter sequence (by construction of `f`).
@@ -562,7 +420,7 @@ mutual
     BarW as → Bars f → Bar ws
   higman₀ ws f all∷ bld as as≡ (nowW good-as) bars-f
     rewrite as≡
-    = ⊥-elim (build-folder→¬goodW bld good-as)
+    = ⊥-elim (bld→¬goodW bld good-as)
   higman₀ ws f all∷ bld as as≡ (laterW l-barw) bars-f =
     higman₁ ws f all∷ bld as as≡ l-barw bars-f
 
@@ -573,8 +431,8 @@ mutual
   higman₁ : ∀ ws f → All∷ ws →
     Build-folder ws f → ∀ as → as ≡ labels f →
     (∀ a → BarW (a ∷ as)) → Bars f → Bar ws
-  higman₁ ws f all∷ bld as as≡ l-barw (bars-now a∈ good-at-i) =
-    now (good∈folder→good bld a∈ good-at-i)
+  higman₁ ws f all∷ bld as as≡ l-barw (bars-now s∈f good-s) =
+    now (good∈folder→good bld s∈f good-s)
   higman₁ ws f all∷ bld as as≡ l-barw (bars-later l-bars) =
     later (λ w → higman₂ w ws f all∷ bld as as≡ l-barw l-bars)
 
@@ -585,7 +443,8 @@ mutual
   higman₂ : ∀ (w : Word) ws f → All∷ ws →
     Build-folder ws f → ∀ as → as ≡ labels f →
     (∀ a → BarW (a ∷ as)) →
-    (∀ u i → Bars (update-folder u f i)) →
+    (∀ u {a} (a∈ : a ∈ labels f) → Bars (update-folder f u a∈)) →
+    --(∀ u i → Bars (update-folder u f i)) →
     Bar (w ∷ ws)
 
   -- []. Bars ([] ∷ ws).
@@ -601,13 +460,13 @@ mutual
     higman₁ ws′ f′ ((λ ()) ∷ all∷)
             (bld-∈ f bld a∈as)
             as as≡as′
-            l-barw (l-bars w (∈index a∈as))
+            l-barw (l-bars w a∈as)
     where
       ws′ = (a ∷ w) ∷ ws
-      f′ = update-folder w f (∈index a∈as)
+      f′ = update-folder f w a∈as
       open ≡-Reasoning
       as≡as′ = begin
-        as ≡⟨ as≡ ⟩ labels f ≡⟨ sym $ upd→labels w f (∈index  a∈as) ⟩ labels f′ ∎
+        as ≡⟨ as≡ ⟩ labels f ≡⟨ sym $ upd→labels f w a∈as ⟩ labels f′ ∎
   ... | no  a∉as =
     -- a ∉labels f. f is extended to f′. So, `a ∷ labels f ≡ labels f′` and
     Bar ws′ ∋
@@ -629,7 +488,7 @@ mutual
 
 bars[] : Bars []
 bars[] = bars-later helper
-  where helper : ∀ u i → Bars (update-folder u [] i)
+  where helper : ∀ u {a} a∈ → Bars (update-folder [] u a∈)
         helper u ()
 
 --
@@ -637,4 +496,4 @@ bars[] = bars-later helper
 --
 
 higman : BarW [] → Bar []
-higman barW[] = higman⊎ [] [] bld-[] [] refl barW[] bars[]
+higman barW[] = higman₀ [] [] [] bld-[] [] refl barW[] bars[]
