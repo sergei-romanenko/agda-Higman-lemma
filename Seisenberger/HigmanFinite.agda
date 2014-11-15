@@ -61,7 +61,8 @@ _∈?_ : (a : Letter) (as : List Letter) → Dec (a ∈ as)
 a ∈? as = any (_≟_ a) as
 
 --
--- GoodW: a sequence of letters is "good" if there is a repeated letter.
+-- `GoodW as`: `as` is "good" if there is a repeated letter.
+--  Namely, as ≡ ... ∷ a′′ ∷ ... ∷ a′ ∷ ... ∷ [] and a′ ≡ a′′ .
 --
 
 data GoodW : List Letter → Set where
@@ -69,7 +70,7 @@ data GoodW : List Letter → Set where
   goodW-later : ∀ {as a} (good-as : GoodW as) → GoodW (a ∷ as)
 
 --
--- BarW: eventually any word becomes good.
+-- `BarW as`: eventually any continuation of `as` becomes good.
 --
 
 data BarW : List Letter → Set where
@@ -99,7 +100,10 @@ data _⊴_ : Word → Word → Set where
 []⊴ [] = ⊴-[]
 []⊴ (a ∷ w) = ⊴-drop ([]⊴ w)
 
--- Good sequences
+--
+-- `GoodW ws`: `ws` is "good" if
+--  ws ≡ ... ∷ w′′ ∷ ... ∷ w′ ∷ ... ∷ [] and w′ ⊴ w′′ .
+--
 
 data _⊵∃_ (v : Word) : Seq → Set where
   ⊵∃-now   : ∀ {w ws} (n : w ⊴ v) → v ⊵∃ w ∷ ws
@@ -109,7 +113,10 @@ data Good : Seq → Set where
   good-now   : ∀ {ws w} (n : w ⊵∃ ws) → Good (w ∷ ws)
   good-later : ∀ {ws w} (l : Good ws) → Good (w ∷ ws)
 
+--
 -- Inductive bars (for sequences of words)
+-- `Bar ws`: eventually any continuation of `ws` becomes good.
+--
 
 data Bar : Seq → Set where
   now   : ∀ {ws} (g : Good ws) → Bar ws
@@ -145,22 +152,22 @@ all∷? ws = All.all []≢? ws
 
 Slot = Letter × Seq × Seq
 
-first : Slot → Letter
-first = proj₁
+label : Slot → Letter
+label = proj₁
 
-subseq₁ : Slot → Seq
-subseq₁ = proj₁ ∘ proj₂
+seq₁ : Slot → Seq
+seq₁ = proj₁ ∘ proj₂
 
-subseq₂ : Slot → Seq
-subseq₂ = proj₂ ∘ proj₂
+seq₂ : Slot → Seq
+seq₂ = proj₂ ∘ proj₂
 
 Folder : Set
 Folder = List Slot
 
-firsts : Folder → List Letter
-firsts = map first
+labels : Folder → List Letter
+labels = map label
 
-∈index : ∀ {f : Folder} {a} (a∈ : a ∈ firsts f) → Fin (length f)
+∈index : ∀ {f : Folder} {a} (a∈ : a ∈ labels f) → Fin (length f)
 ∈index {[]} ()
 ∈index {s ∷ f} (here a≡) = zero
 ∈index {s ∷ f} (there a∈) = suc (∈index a∈)
@@ -171,14 +178,14 @@ slot-at (s ∷ f) zero = s
 slot-at (s ∷ f) (suc i) = slot-at f i
 
 get-++ : Slot → Seq
-get-++ s = subseq₁ s ++ subseq₂ s
+get-++ s = seq₁ s ++ seq₂ s
 
 --
 -- update-slot
 --
 
 update-slot : Word → Slot → Slot
-update-slot u s = first s , u ∷ subseq₁ s , subseq₂ s
+update-slot u s = label s , u ∷ seq₁ s , seq₂ s
 
 -- Seisenberger's `insert-folder`.
 
@@ -201,10 +208,10 @@ extend-folder f a u vs = (a , (u ∷ []) , vs) ∷ f
 data Build-folder : Seq → Folder → Set where
   bld-[] : Build-folder [] []
   bld-∈ : ∀ {a w ws} f (bld : Build-folder ws f)
-    (a∈ : a ∈ firsts f) →
+    (a∈ : a ∈ labels f) →
     Build-folder ((a ∷ w) ∷ ws) (update-folder w f (∈index a∈))
   bld-∉ : ∀ {a w ws} f (bld : Build-folder ws f) →
-    (a∉ : ¬ a ∈ firsts f) →
+    (a∉ : ¬ a ∈ labels f) →
     Build-folder ((a ∷ w) ∷ ws) (extend-folder f a w ws)
 
 --
@@ -269,7 +276,7 @@ a ∷∈ [] = []
 a ∷∈ (w ∷ ws) = (a ∷ w) ∷ a ∷∈ ws
 
 ∷∈-++ : Slot → Seq
-∷∈-++ s = (first s ∷∈ subseq₁ s) ++ subseq₂ s
+∷∈-++ s = (label s ∷∈ seq₁ s) ++ seq₂ s
 
 --
 -- Good (us ++ vs) → Good ((a ∷∈ us) ++ vs)
@@ -295,14 +302,14 @@ good-∷∈-++ a (u ∷ us) vs (good-now g) =
 good-∷∈-++ a (u ∷ us) vs (good-later good-us++vs) =
   good-later (good-∷∈-++ a us vs good-us++vs)
 
--- firsts (update-folder w i f) ≡ firsts f
+-- labels (update-folder w i f) ≡ labels f
 
-upd→firsts : ∀ w f i →
-  firsts (update-folder w f i) ≡ firsts f
-upd→firsts w [] ()
-upd→firsts w (s ∷ f) zero = refl
-upd→firsts w (s ∷ f) (suc i) =
-  cong₂ _∷_ refl (upd→firsts w f i)
+upd→labels : ∀ w f i →
+  labels (update-folder w f i) ≡ labels f
+upd→labels w [] ()
+upd→labels w (s ∷ f) zero = refl
+upd→labels w (s ∷ f) (suc i) =
+  cong₂ _∷_ refl (upd→labels w f i)
 
 --
 -- _≡_ is decidable for Fin n.
@@ -362,7 +369,7 @@ upd-≢ u (s ∷ f) (suc i) (suc j) si≢sj =
 
 update-slot→⋐ : ∀ {w ws} s →
   ∷∈-++ s ⋐ ws →
-    ∷∈-++ (update-slot w s) ⋐ (first s ∷ w) ∷ ws
+    ∷∈-++ (update-slot w s) ⋐ (label s ∷ w) ∷ ws
 update-slot→⋐ {w} {ws} s =
   ∷∈-++ s ⋐ ws
     ≡⟨ refl ⟩
@@ -374,17 +381,17 @@ update-slot→⋐ {w} {ws} s =
     ≡⟨ refl ⟩
   ∷∈-++ (a , w ∷ us , vs) ⋐ (a ∷ w) ∷ ws
     ≡⟨ refl ⟩
-  ∷∈-++ (update-slot w s) ⋐ (first s ∷ w) ∷ ws
+  ∷∈-++ (update-slot w s) ⋐ (label s ∷ w) ∷ ws
   ∎
   where
   open Related.EquationalReasoning
-  a = first s; us = subseq₁ s; vs = subseq₂ s
+  a = label s; us = seq₁ s; vs = seq₂ s
 
 
--- (a∈ : a ∈ firsts f) → a ≡ first (slot-at f (∈index a∈))
+-- (a∈ : a ∈ labels f) → a ≡ label (slot-at f (∈index a∈))
 
-a∈→a≡ : ∀ f {a} (a∈ : a ∈ firsts f)
-          {i} (i≡ : i ≡ ∈index a∈) → a ≡ first (slot-at f i)
+a∈→a≡ : ∀ f {a} (a∈ : a ∈ labels f)
+          {i} (i≡ : i ≡ ∈index a∈) → a ≡ label (slot-at f i)
 a∈→a≡ [] () i≡
 a∈→a≡ (s ∷ f) (here a≡) refl = a≡
 a∈→a≡ (s ∷ f) (there a∈) {zero} ()
@@ -445,7 +452,7 @@ good∈folder→good {ws} {f} bld i good-at-i =
   where
   open Related.EquationalReasoning
   s = slot-at f i
-  a = first s; us = subseq₁ s; vs = subseq₂ s
+  a = label s; us = seq₁ s; vs = seq₂ s
 
   [a∷∈us]++vs⋐ws : (a ∷∈ us) ++ vs ⋐ ws
   [a∷∈us]++vs⋐ws = ∷∈-++-⋐ ws bld i
@@ -490,10 +497,10 @@ bar⊎all∷ ws with all∷? ws
 --
 
 build-folder→¬goodW : ∀ {ws f} → Build-folder ws f →
-  ¬ GoodW (firsts f)
+  ¬ GoodW (labels f)
 build-folder→¬goodW bld-[] ()
 build-folder→¬goodW (bld-∈ {a} {w} f bld a∈) goodW-f
-  rewrite upd→firsts w f (∈index a∈)
+  rewrite upd→labels w f (∈index a∈)
   = build-folder→¬goodW bld goodW-f
 build-folder→¬goodW (bld-∉ f bld a∉) (goodW-now a∈) =
   ⊥-elim (a∉ a∈)
@@ -539,19 +546,19 @@ mutual
   -- Otherwise, we can turn `ws` into a folder.
 
   higman⊎ : ∀ ws f →
-    Build-folder ws f → ∀ as → as ≡ firsts f →
+    Build-folder ws f → ∀ as → as ≡ labels f →
     BarW as → Bars f → Bar ws
   higman⊎ ws f bld as as≡ barw-f bars-f with bar⊎all∷ ws
   ... | inj₁ bar-ws = bar-ws
   ... | inj₂ all∷ =
     higman₀ ws f all∷ bld as as≡ barw-f bars-f
 
-  -- Let `as ≡ firsts f`.
+  -- Let `as ≡ labels f`.
   -- `as` cannot be a good letter sequence (by construction of `f`).
   -- Hence, `BarW as` implies `∀ a → BarW (a ∷ as)`.
 
   higman₀ : ∀ ws f → All∷ ws →
-    Build-folder ws f → ∀ as → as ≡ firsts f →
+    Build-folder ws f → ∀ as → as ≡ labels f →
     BarW as → Bars f → Bar ws
   higman₀ ws f all∷ bld as as≡ (nowW good-as) bars-f
     rewrite as≡
@@ -564,7 +571,7 @@ mutual
   -- Otherwise, `∀ u i → Bars (update-folder u i f)`.
 
   higman₁ : ∀ ws f → All∷ ws →
-    Build-folder ws f → ∀ as → as ≡ firsts f →
+    Build-folder ws f → ∀ as → as ≡ labels f →
     (∀ a → BarW (a ∷ as)) → Bars f → Bar ws
   higman₁ ws f all∷ bld as as≡ l-barw (bars-now a∈ good-at-i) =
     now (good∈folder→good bld a∈ good-at-i)
@@ -576,7 +583,7 @@ mutual
   -- Hence, let's do induction on the first word of the sequence.
 
   higman₂ : ∀ (w : Word) ws f → All∷ ws →
-    Build-folder ws f → ∀ as → as ≡ firsts f →
+    Build-folder ws f → ∀ as → as ≡ labels f →
     (∀ a → BarW (a ∷ as)) →
     (∀ u i → Bars (update-folder u f i)) →
     Bar (w ∷ ws)
@@ -587,9 +594,9 @@ mutual
 
   -- a ∷ w.
   higman₂ (a ∷ w) ws f all∷ bld as as≡ l-barw l-bars
-    with a ∈? firsts f
+    with a ∈? labels f
   ... | yes a∈as =
-    -- a ∈firsts f. f is updated to f′. So, `firsts f ≡ firsts f′`.
+    -- a ∈labels f. f is updated to f′. So, `labels f ≡ labels f′`.
     Bar ws′ ∋
     higman₁ ws′ f′ ((λ ()) ∷ all∷)
             (bld-∈ f bld a∈as)
@@ -600,9 +607,9 @@ mutual
       f′ = update-folder w f (∈index a∈as)
       open ≡-Reasoning
       as≡as′ = begin
-        as ≡⟨ as≡ ⟩ firsts f ≡⟨ sym $ upd→firsts w f (∈index  a∈as) ⟩ firsts f′ ∎
+        as ≡⟨ as≡ ⟩ labels f ≡⟨ sym $ upd→labels w f (∈index  a∈as) ⟩ labels f′ ∎
   ... | no  a∉as =
-    -- a ∉firsts f. f is extended to f′. So, `a ∷ firsts f ≡ firsts f′` and
+    -- a ∉labels f. f is extended to f′. So, `a ∷ labels f ≡ labels f′` and
     Bar ws′ ∋
     higman₀ ws′ f′ ((λ ()) ∷ all∷)
             (bld-∉ f bld a∉as)
