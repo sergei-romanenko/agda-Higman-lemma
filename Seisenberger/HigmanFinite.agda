@@ -1,4 +1,6 @@
+--
 -- An inductive proof of Higman's Lemma for a finite alphabet
+--
 
 open import Relation.Nullary
   using (Dec; yes; no)
@@ -121,23 +123,6 @@ bar[]∷ : ∀ ws → Bar([] ∷ ws)
 bar[]∷ ws = later (λ w → now (good-now (⊵∃-now ([]⊴ w))))
 
 --
--- Non-empty lists
---
-
-[]≢? : (as : Word) → Dec ([] ≢ as)
-[]≢? [] = no (λ []≢[] → []≢[] refl)
-[]≢? (a ∷ as) = yes (λ ())
-
-All∷ : (ws : Seq) → Set
-All∷ = All (_≢_ [])
-
-all∷? : (ws : Seq) → Dec (All∷ ws)
-all∷? ws = All.all []≢? ws
-
-¬All∷-∷→¬All∷ : ∀ {a w ws} → ¬ All∷ ((a ∷ w) ∷ ws) → ¬ All∷ ws
-¬All∷-∷→¬All∷ ¬all∷-∷ all∷ = ¬all∷-∷ ((λ ()) ∷ all∷)
-
---
 -- Folder
 --
 
@@ -162,40 +147,39 @@ seq₁++seq₂ : Slot → Seq
 seq₁++seq₂ s = seq₁ s ++ seq₂ s
 
 --
--- update-slot
+-- Updating folders.
+-- (This corresponds to Seisenberger's `insert-folder`.)
 --
 
 update-slot : Slot → Word → Slot
 update-slot s u = label s , u ∷ seq₁ s , seq₂ s
 
--- Seisenberger's `insert-folder`.
-
-update-folder : ∀ f (u : Word) {a} (a∈ : a ∈ labels f) → Folder
-update-folder [] u ()
-update-folder (s ∷ f) u (here a≡) =
+update : ∀ f (u : Word) {a} (a∈ : a ∈ labels f) → Folder
+update [] u ()
+update (s ∷ f) u (here a≡) =
   update-slot s u ∷ f
-update-folder (s ∷ f) u (there a∈) =
-  s ∷ update-folder f u a∈
+update (s ∷ f) u (there a∈) =
+  s ∷ update f u a∈
 
--- extend-folder
+-- Extending  folders.
 
-extend-folder : ∀ (f : Folder) (a : Letter) (u : Word) (vs : Seq) → Folder
-extend-folder f a u vs = (a , (u ∷ []) , vs) ∷ f
+extend : ∀ (f : Folder) (a : Letter) (u : Word) (vs : Seq) → Folder
+extend f a u vs = (a , (u ∷ []) , vs) ∷ f
 
 --
--- Build-folder
+-- Building folders.
 --
 -- Here Seisenberger defines a function, but we use a relation.
 --
 
-data Build-folder : Seq → Folder → Set where
-  bld-[] : Build-folder [] []
-  bld-∈ : ∀ {a w ws} f (bld : Build-folder ws f)
+data Build : Seq → Folder → Set where
+  bld-[] : Build [] []
+  bld-∈ : ∀ {a w ws} f (bld : Build ws f)
     (a∈ : a ∈ labels f) →
-    Build-folder ((a ∷ w) ∷ ws) (update-folder f w a∈)
-  bld-∉ : ∀ {a w ws} f (bld : Build-folder ws f) →
+    Build ((a ∷ w) ∷ ws) (update f w a∈)
+  bld-∉ : ∀ {a w ws} f (bld : Build ws f) →
     (a∉ : ¬ a ∈ labels f) →
-    Build-folder ((a ∷ w) ∷ ws) (extend-folder f a w ws)
+    Build ((a ∷ w) ∷ ws) (extend f a w ws)
 
 --
 -- Bars
@@ -206,7 +190,7 @@ data Bars : Folder → Set where
     s ∈ f → Good (seq₁++seq₂ s) →
     Bars f
   bars-later : ∀ {f} →
-    (l : ∀ u {a} (a∈ : a ∈ labels f) → Bars (update-folder f u a∈)) →
+    (l : ∀ u {a} (a∈ : a ∈ labels f) → Bars (update f u a∈)) →
     Bars f
 
 --
@@ -285,10 +269,10 @@ good-∷∈-++ a (u ∷ us) vs (good-now g) =
 good-∷∈-++ a (u ∷ us) vs (good-later good-us++vs) =
   good-later (good-∷∈-++ a us vs good-us++vs)
 
--- labels (update-folder w i f) ≡ labels f
+-- labels (update f u {a} a∈) ≡ labels f
 
 upd→labels : ∀ f u {a} a∈ →
-  labels (update-folder f u {a} a∈) ≡ labels f
+  labels (update f u {a} a∈) ≡ labels f
 upd→labels [] u ()
 upd→labels (s ∷ f) u (here refl) =
   refl
@@ -304,7 +288,7 @@ upd→labels (s ∷ f) u (there a∈) =
 ⋐-upd : ∀ {f ws a u} →
   (a∈ : a ∈ labels f) →
   (∀ {s} → s ∈ f → ∷∈-++ s ⋐ ws) →
-  ∀ {s} → s ∈ update-folder f u a∈ → (∷∈-++ s) ⋐ ((a ∷ u) ∷ ws)
+  ∀ {s} → s ∈ update f u a∈ → (∷∈-++ s) ⋐ ((a ∷ u) ∷ ws)
 ⋐-upd {[]} () hf s∈
 ⋐-upd {s ∷ f} (here refl) hf (here refl) =
   ⋐-keep (hf (here refl))
@@ -320,7 +304,7 @@ upd→labels (s ∷ f) u (there a∈) =
 --
 
 ∷∈-++-⋐ : ∀ {ws f} →
-  Build-folder ws f →
+  Build ws f →
   ∀ {s} → s ∈ f → ∷∈-++ s ⋐ ws
 
 ∷∈-++-⋐ bld-[] ()
@@ -341,7 +325,7 @@ upd→labels (s ∷ f) u (there a∈) =
 --
 
 good∈folder→good : ∀ {ws f} →
-  Build-folder ws f →
+  Build ws f →
   ∀ {s} → s ∈ f → Good (seq₁++seq₂ s) →
   Good ws
 good∈folder→good {ws} {f} bld {s} s∈f good-s =
@@ -365,7 +349,7 @@ good∈folder→good {ws} {f} bld {s} s∈f good-s =
 -- bld→¬goodW
 --
 
-bld→¬goodW : ∀ {ws f} → Build-folder ws f →
+bld→¬goodW : ∀ {ws f} → Build ws f →
   ¬ GoodW (labels f)
 bld→¬goodW bld-[] ()
 bld→¬goodW (bld-∈ {a} {w} f bld a∈) goodW-f
@@ -398,11 +382,17 @@ mutual
     bars-now (there s∈f) good-s
   extend-bars₁ {s} {f} l-bar (bars-later l-bars) =
     bars-later helper
-    where helper : ∀ u {a} a∈ → Bars (update-folder (s ∷ f) u a∈)
+    where helper : ∀ u {a} a∈ → Bars (update (s ∷ f) u a∈)
           helper u (here a≡) =
             extend-bars (l-bar u) (bars-later l-bars)
           helper u (there a∈) =
             extend-bars₁ l-bar (l-bars u a∈)
+--
+-- Non-empty lists
+--
+
+All∷ : (ws : Seq) → Set
+All∷ = All (_≢_ [])
 
 --
 -- Now we prove a generalization of Higman's lemma
@@ -416,8 +406,9 @@ mutual
   -- Hence, `BarW as` implies `∀ a → BarW (a ∷ as)`.
 
   higman₀ : ∀ ws f → All∷ ws →
-    Build-folder ws f → ∀ as → as ≡ labels f →
-    BarW as → Bars f → Bar ws
+    Build ws f → ∀ as → as ≡ labels f →
+    BarW as → Bars f →
+    Bar ws
   higman₀ ws f all∷ bld as as≡ (nowW good-as) bars-f
     rewrite as≡
     = ⊥-elim (bld→¬goodW bld good-as)
@@ -426,25 +417,24 @@ mutual
 
   -- If `Bars f` contains (a representation of) a good subsequence,
   -- then ws is good. Hence, `Bar ws`.
-  -- Otherwise, `∀ u i → Bars (update-folder u i f)`.
+  -- Otherwise, `∀ u {a} a∈ → Bars (update f u a∈)`.
 
   higman₁ : ∀ ws f → All∷ ws →
-    Build-folder ws f → ∀ as → as ≡ labels f →
-    (∀ a → BarW (a ∷ as)) → Bars f → Bar ws
+    Build ws f → ∀ as → as ≡ labels f →
+    (∀ a → BarW (a ∷ as)) → Bars f →
+    Bar ws
   higman₁ ws f all∷ bld as as≡ l-barw (bars-now s∈f good-s) =
     now (good∈folder→good bld s∈f good-s)
   higman₁ ws f all∷ bld as as≡ l-barw (bars-later l-bars) =
     later (λ w → higman₂ w ws f all∷ bld as as≡ l-barw l-bars)
 
-  -- Now `∀ a → BarW (a ∷ as)`, `∀ u i → Bars (update-folder u i f))` and
+  -- Now `∀ a → BarW (a ∷ as)`, `∀ u {a} a∈ → Bars (update f u a∈)` and
   -- the word sequence *is not empty*.
   -- Hence, let's do induction on the first word of the sequence.
 
   higman₂ : ∀ (w : Word) ws f → All∷ ws →
-    Build-folder ws f → ∀ as → as ≡ labels f →
-    (∀ a → BarW (a ∷ as)) →
-    (∀ u {a} (a∈ : a ∈ labels f) → Bars (update-folder f u a∈)) →
-    --(∀ u i → Bars (update-folder u f i)) →
+    Build ws f → ∀ as → as ≡ labels f →
+    (∀ a → BarW (a ∷ as)) → (∀ u {a} a∈ → Bars (update f u a∈)) →
     Bar (w ∷ ws)
 
   -- []. Bars ([] ∷ ws).
@@ -463,7 +453,7 @@ mutual
             l-barw (l-bars w a∈as)
     where
       ws′ = (a ∷ w) ∷ ws
-      f′ = update-folder f w a∈as
+      f′ = update f w a∈as
       open ≡-Reasoning
       as≡as′ = begin
         as ≡⟨ as≡ ⟩ labels f ≡⟨ sym $ upd→labels f w a∈as ⟩ labels f′ ∎
@@ -476,7 +466,7 @@ mutual
             (l-barw a) bars-f′
     where
       ws′ = (a ∷ w) ∷ ws
-      f′ = extend-folder f a w ws
+      f′ = extend f a w ws
       bar-w∷ws : Bar (w ∷ ws)
       bar-w∷ws = higman₂ w ws f all∷ bld as as≡ l-barw l-bars
       bars-f′ : Bars f′
@@ -488,7 +478,7 @@ mutual
 
 bars[] : Bars []
 bars[] = bars-later helper
-  where helper : ∀ u {a} a∈ → Bars (update-folder [] u a∈)
+  where helper : ∀ u {a} a∈ → Bars (update [] u a∈)
         helper u ()
 
 --
