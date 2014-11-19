@@ -67,8 +67,8 @@ data GoodW : List Letter → Set where
 --
 
 data BarW : List Letter → Set where
-  nowW   : ∀ {as} (g : GoodW as) → BarW as
-  laterW : ∀ {as} (l : ∀ a → BarW(a ∷ as)) → BarW as
+  barW-now   : ∀ {as} (g : GoodW as) → BarW as
+  barW-later : ∀ {as} (l : ∀ a → BarW(a ∷ as)) → BarW as
 
 -- Words and sequences
 
@@ -78,28 +78,28 @@ Word = List Letter
 Seq : Set
 Seq = List Word
 
-infix 4 _⊴_ _⊵∃_
+infix 4 _⊵_ _⊵∃_
 
 -- Homeomorphic embedding of words
 
-data _⊴_ : Word → Word → Set where
-  ⊴-[]   : [] ⊴ []
-  ⊴-drop : ∀ {v w a} → v ⊴ w → v ⊴ a ∷ w
-  ⊴-keep : ∀ {v w a} → v ⊴ w → a ∷ v ⊴ a ∷ w
+data _⊵_ : Word → Word → Set where
+  ⊵-[]   : [] ⊵ []
+  ⊵-drop : ∀ {w v a} → w ⊵ v → a ∷ w ⊵ v
+  ⊵-keep : ∀ {w v a} → w ⊵ v → a ∷ w ⊵ a ∷ v
 
 -- [] is embeddable in any word.
 
-[]⊴ : ∀ w → [] ⊴ w
-[]⊴ [] = ⊴-[]
-[]⊴ (a ∷ w) = ⊴-drop ([]⊴ w)
+⊵[] : ∀ w → w ⊵ []
+⊵[] [] = ⊵-[]
+⊵[] (a ∷ w) = ⊵-drop (⊵[] w)
 
 --
 -- `GoodW ws`: `ws` is "good" if
---  ws ≡ ... ∷ w′′ ∷ ... ∷ w′ ∷ ... ∷ [] and w′ ⊴ w′′ .
+--  ws ≡ ... ∷ w′′ ∷ ... ∷ w′ ∷ ... ∷ [] and w′′ ⊵ w′ .
 --
 
 data _⊵∃_ (v : Word) : Seq → Set where
-  ⊵∃-now   : ∀ {w ws} (n : w ⊴ v) → v ⊵∃ w ∷ ws
+  ⊵∃-now   : ∀ {w ws} (n : v ⊵ w) → v ⊵∃ w ∷ ws
   ⊵∃-later : ∀ {w ws} (l : v ⊵∃ ws) → v ⊵∃ w ∷ ws
 
 data Good : Seq → Set where
@@ -120,7 +120,7 @@ data Bar : Seq → Set where
 --
 
 bar[]∷ : ∀ ws → Bar([] ∷ ws)
-bar[]∷ ws = later (λ w → now (good-now (⊵∃-now ([]⊴ w))))
+bar[]∷ ws = later (λ w → now (good-now (⊵∃-now (⊵[] w))))
 
 --
 -- Folder
@@ -151,13 +151,10 @@ seq₁++seq₂ s = seq₁ s ++ seq₂ s
 -- (This corresponds to Seisenberger's `insert-folder`.)
 --
 
-update-slot : Slot → Word → Slot
-update-slot s u = label s , u ∷ seq₁ s , seq₂ s
-
 update : ∀ f (u : Word) {a} (a∈ : a ∈ labels f) → Folder
 update [] u ()
 update (s ∷ f) u (here a≡) =
-  update-slot s u ∷ f
+  (label s , u ∷ seq₁ s , seq₂ s) ∷ f
 update (s ∷ f) u (there a∈) =
   s ∷ update f u a∈
 
@@ -195,7 +192,7 @@ data Bars : Folder → Set where
 
 --
 -- Subsequences
--- (As in the case of _⊴_, this is a homeomorphic embedding).
+-- (As in the case of _⊵_, this is a homeomorphic embedding).
 --
 
 infix 4 _⋐_
@@ -215,8 +212,8 @@ data _⋐_ : Seq → Seq → Set where
 ⊵∃-mono ⋐-[] ()
 ⊵∃-mono (⋐-drop vs⋐ws) v⊵∃vs =
   ⊵∃-later (⊵∃-mono vs⋐ws v⊵∃vs)
-⊵∃-mono (⋐-keep vs⋐ws) (⊵∃-now v′⊴v) =
-  ⊵∃-now v′⊴v
+⊵∃-mono (⋐-keep vs⋐ws) (⊵∃-now v⊵v′) =
+  ⊵∃-now v⊵v′
 ⊵∃-mono (⋐-keep vs⋐ws) (⊵∃-later v⊵∃vs) =
   ⊵∃-later (⊵∃-mono vs⋐ws v⊵∃vs)
 
@@ -250,13 +247,13 @@ a ∷∈ (w ∷ ws) = (a ∷ w) ∷ a ∷∈ ws
 --
 
 ∷⊵∃ : ∀ {a w ws} → w ⊵∃ ws → a ∷ w ⊵∃ ws
-∷⊵∃ (⊵∃-now g) = ⊵∃-now (⊴-drop g)
+∷⊵∃ (⊵∃-now g) = ⊵∃-now (⊵-drop g)
 ∷⊵∃ (⊵∃-later l) = ⊵∃-later (∷⊵∃ l)
 
 ⊵∃-∷∈-++ : ∀ a w us vs →
   w ⊵∃ us ++ vs → a ∷ w ⊵∃ (a ∷∈ us) ++ vs
 ⊵∃-∷∈-++ a w [] vs w⊵∃vs = ∷⊵∃ w⊵∃vs
-⊵∃-∷∈-++ a w (u ∷ us) vs (⊵∃-now g) = ⊵∃-now (⊴-keep g)
+⊵∃-∷∈-++ a w (u ∷ us) vs (⊵∃-now g) = ⊵∃-now (⊵-keep g)
 ⊵∃-∷∈-++ a w (u ∷ us) vs (⊵∃-later a∷w⊵) =
   ⊵∃-later (⊵∃-∷∈-++ a w us vs a∷w⊵)
 
@@ -269,16 +266,6 @@ good-∷∈-++ a (u ∷ us) vs (good-now g) =
 good-∷∈-++ a (u ∷ us) vs (good-later good-us++vs) =
   good-later (good-∷∈-++ a us vs good-us++vs)
 
--- labels (update f u {a} a∈) ≡ labels f
-
-upd→labels : ∀ f u {a} a∈ →
-  labels (update f u {a} a∈) ≡ labels f
-upd→labels [] u ()
-upd→labels (s ∷ f) u (here refl) =
-  refl
-upd→labels (s ∷ f) u (there a∈) =
-  cong₂ _∷_ refl (upd→labels f u a∈)
-
 --
 -- Now we are going to prove a subtle fact:
 -- if there is a slot `(a , us , vs)` such that `Good (us ++ vs)`,
@@ -288,7 +275,8 @@ upd→labels (s ∷ f) u (there a∈) =
 ⋐-upd : ∀ {f ws a u} →
   (a∈ : a ∈ labels f) →
   (∀ {s} → s ∈ f → ∷∈-++ s ⋐ ws) →
-  ∀ {s} → s ∈ update f u a∈ → (∷∈-++ s) ⋐ ((a ∷ u) ∷ ws)
+  (∀ {s} → s ∈ update f u a∈ → (∷∈-++ s) ⋐ ((a ∷ u) ∷ ws))
+
 ⋐-upd {[]} () hf s∈
 ⋐-upd {s ∷ f} (here refl) hf (here refl) =
   ⋐-keep (hf (here refl))
@@ -346,14 +334,26 @@ good∈folder→good {ws} {f} bld {s} s∈f good-s =
     ∎
 
 --
--- bld→¬goodW
+-- labels (update f u {a} a∈) ≡ labels f
 --
 
-bld→¬goodW : ∀ {ws f} → Build ws f →
-  ¬ GoodW (labels f)
+labels∘update≡ : ∀ f u {a} a∈ →
+  labels (update f u {a} a∈) ≡ labels f
+labels∘update≡ [] u ()
+labels∘update≡ (s ∷ f) u (here refl) =
+  refl
+labels∘update≡ (s ∷ f) u (there a∈) =
+  cong₂ _∷_ refl (labels∘update≡ f u a∈)
+
+--
+-- Build ws f → ¬ GoodW (labels f)
+--
+
+bld→¬goodW : ∀ {ws f} →
+  Build ws f → ¬ GoodW (labels f)
 bld→¬goodW bld-[] ()
 bld→¬goodW (bld-∈ {a} {w} f bld a∈) goodW-f
-  rewrite upd→labels f w a∈
+  rewrite labels∘update≡ f w a∈
   = bld→¬goodW bld goodW-f
 bld→¬goodW (bld-∉ f bld a∉) (goodW-now a∈) =
   ⊥-elim (a∉ a∈)
@@ -406,71 +406,63 @@ mutual
   -- Hence, `BarW as` implies `∀ a → BarW (a ∷ as)`.
 
   higman₀ : ∀ ws f → All∷ ws →
-    Build ws f → ∀ as → as ≡ labels f →
+    Build ws f → ∀ {as} → as ≡ labels f →
     BarW as → Bars f →
     Bar ws
-  higman₀ ws f all∷ bld as as≡ (nowW good-as) bars-f
+  higman₀ ws f all∷ bld as≡ (barW-now good-as) bars-f
     rewrite as≡
     = ⊥-elim (bld→¬goodW bld good-as)
-  higman₀ ws f all∷ bld as as≡ (laterW l-barw) bars-f =
-    higman₁ ws f all∷ bld as as≡ l-barw bars-f
+  higman₀ ws f all∷ bld as≡ (barW-later l-barw) bars-f =
+    higman₁ ws f all∷ bld as≡ l-barw bars-f
 
   -- If `Bars f` contains (a representation of) a good subsequence,
   -- then ws is good. Hence, `Bar ws`.
   -- Otherwise, `∀ u {a} a∈ → Bars (update f u a∈)`.
 
   higman₁ : ∀ ws f → All∷ ws →
-    Build ws f → ∀ as → as ≡ labels f →
+    Build ws f → ∀ {as} → as ≡ labels f →
     (∀ a → BarW (a ∷ as)) → Bars f →
     Bar ws
-  higman₁ ws f all∷ bld as as≡ l-barw (bars-now s∈f good-s) =
+  higman₁ ws f all∷ bld as≡ l-barw (bars-now s∈f good-s) =
     now (good∈folder→good bld s∈f good-s)
-  higman₁ ws f all∷ bld as as≡ l-barw (bars-later l-bars) =
-    later (λ w → higman₂ w ws f all∷ bld as as≡ l-barw l-bars)
+  higman₁ ws f all∷ bld as≡ l-barw (bars-later l-bars) =
+    later (λ w → higman₂ w ws f all∷ bld as≡ l-barw l-bars)
 
   -- Now `∀ a → BarW (a ∷ as)`, `∀ u {a} a∈ → Bars (update f u a∈)` and
   -- the word sequence *is not empty*.
   -- Hence, let's do induction on the first word of the sequence.
 
   higman₂ : ∀ (w : Word) ws f → All∷ ws →
-    Build ws f → ∀ as → as ≡ labels f →
+    Build ws f → ∀ {as} → as ≡ labels f →
     (∀ a → BarW (a ∷ as)) → (∀ u {a} a∈ → Bars (update f u a∈)) →
     Bar (w ∷ ws)
 
   -- []. Bars ([] ∷ ws).
-  higman₂ [] ws f all∷ bld as as≡ l-barw l-bars =
+  higman₂ [] ws f all∷ bld as≡ l-barw l-bars =
     bar[]∷ ws
 
   -- a ∷ w.
-  higman₂ (a ∷ w) ws f all∷ bld as as≡ l-barw l-bars
+  higman₂ (a ∷ w) ws f all∷ bld as≡ l-barw l-bars
     with a ∈? labels f
   ... | yes a∈as =
     -- a ∈labels f. f is updated to f′. So, `labels f ≡ labels f′`.
-    Bar ws′ ∋
-    higman₁ ws′ f′ ((λ ()) ∷ all∷)
+    higman₁ ((a ∷ w) ∷ ws) (update f w a∈as)
+            ((λ ()) ∷ all∷)
             (bld-∈ f bld a∈as)
-            as as≡as′
+            (trans as≡ (sym $ labels∘update≡ f w a∈as))
             l-barw (l-bars w a∈as)
-    where
-      ws′ = (a ∷ w) ∷ ws
-      f′ = update f w a∈as
-      open ≡-Reasoning
-      as≡as′ = begin
-        as ≡⟨ as≡ ⟩ labels f ≡⟨ sym $ upd→labels f w a∈as ⟩ labels f′ ∎
   ... | no  a∉as =
     -- a ∉labels f. f is extended to f′. So, `a ∷ labels f ≡ labels f′` and
-    Bar ws′ ∋
-    higman₀ ws′ f′ ((λ ()) ∷ all∷)
+    higman₀ ((a ∷ w) ∷ ws) (extend f a w ws)
+            ((λ ()) ∷ all∷)
             (bld-∉ f bld a∉as)
-            (a ∷ as) (cong (_∷_ a) as≡)
-            (l-barw a) bars-f′
+            (cong (_∷_ a) as≡)
+            (l-barw a) bars′
     where
-      ws′ = (a ∷ w) ∷ ws
-      f′ = extend f a w ws
-      bar-w∷ws : Bar (w ∷ ws)
-      bar-w∷ws = higman₂ w ws f all∷ bld as as≡ l-barw l-bars
-      bars-f′ : Bars f′
-      bars-f′ = extend-bars bar-w∷ws (bars-later l-bars)
+      bar′ : Bar (w ∷ ws)
+      bar′ = higman₂ w ws f all∷ bld as≡ l-barw l-bars
+      bars′ : Bars (extend f a w ws)
+      bars′ = extend-bars bar′ (bars-later l-bars)
 
 --
 -- bars[]
@@ -486,4 +478,4 @@ bars[] = bars-later helper
 --
 
 higman : BarW [] → Bar []
-higman barW[] = higman₀ [] [] [] bld-[] [] refl barW[] bars[]
+higman barW[] = higman₀ [] [] [] bld-[] refl barW[] bars[]
