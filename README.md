@@ -1,7 +1,8 @@
-# Constructive proofs of Higman’s lemma formalized in Agda
+# Constructive proofs of Higman’s lemma implemented in Agda
 
 * The folder `Berghofer`: a proof by Stefan Berghofer (for a two-letter alphabet).
-* The folder `Seisenberger`: a proof by Monika Seisenberger (for a finite alphabet).
+* The folder `Seisenberger`: proofs by Monika Seisenberger (for a finite alphabet
+  and for an infinite alphabet).
 
 This version is compatible with
 
