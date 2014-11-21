@@ -494,13 +494,6 @@ data Bars : Forest → Set where
     Bars f
 
 --
--- Non-empty lists
---
-
-All∷ : (ws : Seq) → Set
-All∷ = All (_≢_ [])
-
---
 -- Build ws f → BadW (labels f)
 --
 
@@ -598,46 +591,46 @@ mutual
   -- `as` cannot be a good letter sequence (by construction of `f`).
   -- Hence, `BarW as` implies `∀ a → BarW (a ∷ as)`.
 
-  higman₀ : ∀ ws f → All∷ ws →
+  higman₀ : ∀ ws f →
     Build ws f → ∀ {as} → as ≡ labels f →
     BarW as → Bars f → Bar ws
-  higman₀ ws f all∷ bld as≡ (nowW good-as) bars-f =
+  higman₀ ws f bld as≡ (nowW good-as) bars-f =
     ⊥-elim (bld→bad-as bld as≡ good-as)
-  higman₀ ws f all∷ bld as≡ (laterW l-barw) bars-f =
-    higman₁ ws f all∷ bld as≡ l-barw bars-f
+  higman₀ ws f bld as≡ (laterW l-barw) bars-f =
+    higman₁ ws f bld as≡ l-barw bars-f
 
   -- If `Bars f` contains (a representation of) a good subsequence,
   -- then ws is good. Hence, `Bar ws`.
   -- Otherwise, `∀ a v a≥∃ → Bars (update f a v a≥∃)`.
 
-  higman₁ : ∀ ws f → All∷ ws →
+  higman₁ : ∀ ws f →
     Build ws f → ∀ {as} → as ≡ labels f →
     (∀ a → BarW (a ∷ as)) → Bars f → Bar ws
-  higman₁ ws f all∷ bld as≡ l-barw (bars-now r≪∃ good-r) =
+  higman₁ ws f bld as≡ l-barw (bars-now r≪∃ good-r) =
     now (good∈forest→good bld r≪∃ good-r)
-  higman₁ ws f all∷ bld as≡ l-barw (bars-later l-bars) =
-    later (λ w → higman₂ w ws f all∷ bld as≡ l-barw l-bars)
+  higman₁ ws f bld as≡ l-barw (bars-later l-bars) =
+    later (λ w → higman₂ w ws f bld as≡ l-barw l-bars)
 
   -- Now the word sequence *is not empty*.
   -- Hence, let's do induction on the first word of the sequence.
 
-  higman₂ : ∀ (w : Word) ws f → All∷ ws →
+  higman₂ : ∀ (w : Word) ws f →
     Build ws f → ∀ {as} → as ≡ labels f →
     (∀ a → BarW (a ∷ as)) →
     (∀ {a} v a≥∃ → Bars (update f a v a≥∃)) →
     Bar (w ∷ ws)
 
   -- []. Bars ([] ∷ ws).
-  higman₂ [] ws f all∷ bld as≡ l-barw l-bars =
+  higman₂ [] ws f bld as≡ l-barw l-bars =
     bar[]∷ ws
 
   -- a ∷ w.
-  higman₂ (a ∷ w) ws f all∷ bld {as} as≡ l-barw l-bars
+  higman₂ (a ∷ w) ws f bld {as} as≡ l-barw l-bars
     with a ≥∃? as
   ... | yes a≥∃as =
     -- a ≥∃ labels f. f is updated to f′.
     -- So, `labels f ≡ labels f′`.
-    higman₁ ((a ∷ w) ∷ ws) (update f a w a≥∃) ((λ ()) ∷ all∷)
+    higman₁ ((a ∷ w) ∷ ws) (update f a w a≥∃)
             (bld-≥ bld a≥∃) (bs≡→bs≡upd f a w a≥∃ as≡)
             l-barw (l-bars w a≥∃)
     where
@@ -647,21 +640,20 @@ mutual
   ... | no  a≱∃as =
     -- a ≱∃ labels f. f is extended to f′.
     -- So, a ∷ labels f ≡  labels f′.
-    higman₀ ((a ∷ w) ∷ ws) (extend a w ws f) ((λ ()) ∷ all∷)
+    higman₀ ((a ∷ w) ∷ ws) (extend a w ws f)
             (bld-≱ bld a≱∃)
             (cong (_∷_ a) as≡)
-            (l-barw a) bars′
+            (l-barw a)
+            (bars∷ (bars∷[] as≡ (bld→bad-as bld as≡)
+                            (laterW l-barw)
+                            (higman₂ w ws f bld as≡ l-barw l-bars)
+                            (bars-later l-bars))
+                    (bars-later l-bars))
     where
       a≱∃ : ¬ a ≥∃ labels f
       a≱∃ = a ≥∃ labels f  ∼⟨ subst (_≥∃_ a) (P.sym $ as≡) ⟩
             a ≥∃ as ∼⟨ a≱∃as ⟩ ⊥ ∎
         where open Related.EquationalReasoning
-      bar′ : Bar (w ∷ ws)
-      bar′ = higman₂ w ws f all∷ bld as≡ l-barw l-bars
-      bars′ : Bars (extend a w ws f)
-      bars′ = bars∷ (bars∷[] as≡ (bld→bad-as bld as≡)
-                             (laterW l-barw) bar′ (bars-later l-bars))
-                    (bars-later l-bars)
 
 --
 -- bars[]
@@ -677,4 +669,4 @@ bars[] = bars-later helper
 --
 
 higman : BarW [] → Bar []
-higman barW[] = higman₀ [] [] [] bld-[] refl barW[] bars[]
+higman barW[] = higman₀ [] [] bld-[] refl barW[] bars[]

@@ -387,12 +387,6 @@ mutual
             extend-bars (l-bar u) (bars-later l-bars)
           helper u (there a∈) =
             extend-bars₁ l-bar (l-bars u a∈)
---
--- Non-empty lists
---
-
-All∷ : (ws : Seq) → Set
-All∷ = All (_≢_ [])
 
 --
 -- Now we prove a generalization of Higman's lemma
@@ -405,64 +399,59 @@ mutual
   -- `as` cannot be a good letter sequence (by construction of `f`).
   -- Hence, `BarW as` implies `∀ a → BarW (a ∷ as)`.
 
-  higman₀ : ∀ ws f → All∷ ws →
+  higman₀ : ∀ ws f →
     Build ws f → ∀ {as} → as ≡ labels f →
     BarW as → Bars f →
     Bar ws
-  higman₀ ws f all∷ bld as≡ (barW-now good-as) bars-f
+  higman₀ ws f bld as≡ (barW-now good-as) bars-f
     rewrite as≡
     = ⊥-elim (bld→¬goodW bld good-as)
-  higman₀ ws f all∷ bld as≡ (barW-later l-barw) bars-f =
-    higman₁ ws f all∷ bld as≡ l-barw bars-f
+  higman₀ ws f bld as≡ (barW-later l-barw) bars-f =
+    higman₁ ws f bld as≡ l-barw bars-f
 
   -- If `Bars f` contains (a representation of) a good subsequence,
   -- then ws is good. Hence, `Bar ws`.
   -- Otherwise, `∀ u {a} a∈ → Bars (update f u a∈)`.
 
-  higman₁ : ∀ ws f → All∷ ws →
+  higman₁ : ∀ ws f →
     Build ws f → ∀ {as} → as ≡ labels f →
     (∀ a → BarW (a ∷ as)) → Bars f →
     Bar ws
-  higman₁ ws f all∷ bld as≡ l-barw (bars-now s∈f good-s) =
+  higman₁ ws f bld as≡ l-barw (bars-now s∈f good-s) =
     now (good∈folder→good bld s∈f good-s)
-  higman₁ ws f all∷ bld as≡ l-barw (bars-later l-bars) =
-    later (λ w → higman₂ w ws f all∷ bld as≡ l-barw l-bars)
+  higman₁ ws f bld as≡ l-barw (bars-later l-bars) =
+    later (λ w → higman₂ w ws f bld as≡ l-barw l-bars)
 
   -- Now `∀ a → BarW (a ∷ as)`, `∀ u {a} a∈ → Bars (update f u a∈)` and
   -- the word sequence *is not empty*.
   -- Hence, let's do induction on the first word of the sequence.
 
-  higman₂ : ∀ (w : Word) ws f → All∷ ws →
+  higman₂ : ∀ w ws f →
     Build ws f → ∀ {as} → as ≡ labels f →
     (∀ a → BarW (a ∷ as)) → (∀ u {a} a∈ → Bars (update f u a∈)) →
     Bar (w ∷ ws)
 
-  -- []. Bars ([] ∷ ws).
-  higman₂ [] ws f all∷ bld as≡ l-barw l-bars =
+  -- []. Bar ([] ∷ ws).
+  higman₂ [] ws f bld as≡ l-barw l-bars =
     bar[]∷ ws
 
   -- a ∷ w.
-  higman₂ (a ∷ w) ws f all∷ bld as≡ l-barw l-bars
+  higman₂ (a ∷ w) ws f bld as≡ l-barw l-bars
     with a ∈? labels f
   ... | yes a∈as =
     -- a ∈labels f. f is updated to f′. So, `labels f ≡ labels f′`.
     higman₁ ((a ∷ w) ∷ ws) (update f w a∈as)
-            ((λ ()) ∷ all∷)
             (bld-∈ f bld a∈as)
             (trans as≡ (sym $ labels∘update≡ f w a∈as))
             l-barw (l-bars w a∈as)
   ... | no  a∉as =
-    -- a ∉labels f. f is extended to f′. So, `a ∷ labels f ≡ labels f′` and
+    -- a ∉labels f. f is extended to f′. So, `a ∷ labels f ≡ labels f′`.
     higman₀ ((a ∷ w) ∷ ws) (extend f a w ws)
-            ((λ ()) ∷ all∷)
             (bld-∉ f bld a∉as)
             (cong (_∷_ a) as≡)
-            (l-barw a) bars′
-    where
-      bar′ : Bar (w ∷ ws)
-      bar′ = higman₂ w ws f all∷ bld as≡ l-barw l-bars
-      bars′ : Bars (extend f a w ws)
-      bars′ = extend-bars bar′ (bars-later l-bars)
+            (l-barw a)
+            (extend-bars (higman₂ w ws f bld as≡ l-barw l-bars)
+                         (bars-later l-bars))
 
 --
 -- bars[]
@@ -478,4 +467,4 @@ bars[] = bars-later helper
 --
 
 higman : BarW [] → Bar []
-higman barW[] = higman₀ [] [] [] bld-[] refl barW[] bars[]
+higman barW[] = higman₀ [] [] bld-[] refl barW[] bars[]
