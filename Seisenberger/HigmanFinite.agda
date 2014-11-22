@@ -70,7 +70,7 @@ data BarW : List Letter → Set where
   barW-now   : ∀ {as} (g : GoodW as) → BarW as
   barW-later : ∀ {as} (l : ∀ a → BarW(a ∷ as)) → BarW as
 
--- Words and sequences
+-- Words and sequences.
 
 Word : Set
 Word = List Letter
@@ -80,7 +80,7 @@ Seq = List Word
 
 infix 4 _⊵_ _⊵∃_
 
--- Homeomorphic embedding of words
+-- Homeomorphic embedding of words.
 
 data _⊵_ : Word → Word → Set where
   ⊵-[]   : [] ⊵ []
@@ -94,13 +94,12 @@ data _⊵_ : Word → Word → Set where
 ⊵[] (a ∷ w) = ⊵-drop (⊵[] w)
 
 --
--- `GoodW ws`: `ws` is "good" if
+-- `Good ws`: `ws` is "good" if
 --  ws ≡ ... ∷ w′′ ∷ ... ∷ w′ ∷ ... ∷ [] and w′′ ⊵ w′ .
 --
 
-data _⊵∃_ (v : Word) : Seq → Set where
-  ⊵∃-now   : ∀ {w ws} (n : v ⊵ w) → v ⊵∃ w ∷ ws
-  ⊵∃-later : ∀ {w ws} (l : v ⊵∃ ws) → v ⊵∃ w ∷ ws
+_⊵∃_ : (w : Word) (ws : Seq) → Set
+w ⊵∃ ws = Any (_⊵_ w) ws
 
 data Good : Seq → Set where
   good-now   : ∀ {ws w} (n : w ⊵∃ ws) → Good (w ∷ ws)
@@ -116,11 +115,12 @@ data Bar : Seq → Set where
   later : ∀ {ws} (l : ∀ w → Bar (w ∷ ws)) → Bar ws
 
 --
--- prop1
+-- In some papers this lemma is called "prop1".
+-- (A very expressiove and informative name...) :-)
 --
 
 bar[]∷ : ∀ ws → Bar([] ∷ ws)
-bar[]∷ ws = later (λ w → now (good-now (⊵∃-now (⊵[] w))))
+bar[]∷ ws = later (λ w → now (good-now (here (⊵[] w))))
 
 --
 -- Folder
@@ -164,9 +164,8 @@ extend : ∀ (f : Folder) (a : Letter) (u : Word) (vs : Seq) → Folder
 extend f a u vs = (a , (u ∷ []) , vs) ∷ f
 
 --
--- Building folders.
---
--- Here Seisenberger defines a function, but we use a relation.
+-- Building a folder from a word sequence.
+-- (Here Seisenberger defines a function, but we use a relation.)
 --
 
 data Build : Seq → Folder → Set where
@@ -209,35 +208,34 @@ data _⋐_ : Seq → Seq → Set where
 -- The monotonicity of _⊵∃_ and Good with respect to _⋐_ .
 
 ⊵∃-mono : ∀ {v vs ws} → vs ⋐ ws → v ⊵∃ vs → v ⊵∃ ws
-⊵∃-mono ⋐-[] ()
-⊵∃-mono (⋐-drop vs⋐ws) v⊵∃vs =
-  ⊵∃-later (⊵∃-mono vs⋐ws v⊵∃vs)
-⊵∃-mono (⋐-keep vs⋐ws) (⊵∃-now v⊵v′) =
-  ⊵∃-now v⊵v′
-⊵∃-mono (⋐-keep vs⋐ws) (⊵∃-later v⊵∃vs) =
-  ⊵∃-later (⊵∃-mono vs⋐ws v⊵∃vs)
+⊵∃-mono ⋐-[] v⊵∃ = v⊵∃
+⊵∃-mono (⋐-drop vs⋐) v⊵∃ =
+  there (⊵∃-mono vs⋐ v⊵∃)
+⊵∃-mono (⋐-keep vs⋐) (here v⊵) =
+  here v⊵
+⊵∃-mono (⋐-keep vs⋐) (there v⊵∃) =
+  there (⊵∃-mono vs⋐ v⊵∃)
 
 good-mono : ∀ {vs ws} → vs ⋐ ws → Good vs → Good ws
 good-mono ⋐-[] ()
-good-mono (⋐-drop vs⋐ws) good-vs =
-  good-later (good-mono vs⋐ws good-vs)
-good-mono (⋐-keep vs⋐ws) (good-now v⊵∃vs) =
-  good-now (⊵∃-mono vs⋐ws v⊵∃vs)
-good-mono (⋐-keep vs⋐ws) (good-later good-vs) =
-  good-later (good-mono vs⋐ws good-vs)
+good-mono (⋐-drop vs⋐) good-vs =
+  good-later (good-mono vs⋐ good-vs)
+good-mono (⋐-keep vs⋐) (good-now v⊵∃) =
+  good-now (⊵∃-mono vs⋐ v⊵∃)
+good-mono (⋐-keep vs⋐) (good-later good-vs) =
+  good-later (good-mono vs⋐ good-vs)
 
---
--- "Division" of sequences
---   (a ∷∈ us) ++ vs ≡ ws
 --
 -- The following function adds a letter to each word in a word list.
--- (In a sense, this is "multiplication".)
+-- 
 
-infixr 5 _∷∈_
+infixr 6 _∷∈_
 
 _∷∈_ : (a : Letter) (ws : List Word) → List Word
-a ∷∈ [] = []
-a ∷∈ (w ∷ ws) = (a ∷ w) ∷ a ∷∈ ws
+a ∷∈ ws = map (_∷_ a) ws
+
+-- "Zipping" a slot, to restore a subsequence of the original sequence.
+-- ∷∈-++ (a , us , vs) ≡ (a ∷∈ us) ++ vs
 
 ∷∈-++ : Slot → Seq
 ∷∈-++ s = (label s ∷∈ seq₁ s) ++ seq₂ s
@@ -247,22 +245,23 @@ a ∷∈ (w ∷ ws) = (a ∷ w) ∷ a ∷∈ ws
 --
 
 ∷⊵∃ : ∀ {a w ws} → w ⊵∃ ws → a ∷ w ⊵∃ ws
-∷⊵∃ (⊵∃-now g) = ⊵∃-now (⊵-drop g)
-∷⊵∃ (⊵∃-later l) = ⊵∃-later (∷⊵∃ l)
+∷⊵∃ (here w⊵) = here (⊵-drop w⊵)
+∷⊵∃ (there w⊵∃) = there (∷⊵∃ w⊵∃)
 
-⊵∃-∷∈-++ : ∀ a w us vs →
+⊵∃-∷∈-++ : ∀ {a w} us {vs} →
   w ⊵∃ us ++ vs → a ∷ w ⊵∃ (a ∷∈ us) ++ vs
-⊵∃-∷∈-++ a w [] vs w⊵∃vs = ∷⊵∃ w⊵∃vs
-⊵∃-∷∈-++ a w (u ∷ us) vs (⊵∃-now g) = ⊵∃-now (⊵-keep g)
-⊵∃-∷∈-++ a w (u ∷ us) vs (⊵∃-later a∷w⊵) =
-  ⊵∃-later (⊵∃-∷∈-++ a w us vs a∷w⊵)
+⊵∃-∷∈-++ [] w⊵∃ = ∷⊵∃ w⊵∃
+⊵∃-∷∈-++ (u ∷ us) (here w⊵) =
+  here (⊵-keep w⊵)
+⊵∃-∷∈-++ (u ∷ us) (there w⊵∃) =
+  there (⊵∃-∷∈-++ us w⊵∃)
 
 good-∷∈-++ : ∀ a us vs →
   Good (us ++ vs) → Good ((a ∷∈ us) ++ vs)
 good-∷∈-++ a [] vs good-[]++vs =
   good-[]++vs
 good-∷∈-++ a (u ∷ us) vs (good-now g) =
-  good-now (⊵∃-∷∈-++ a u us vs g)
+  good-now (⊵∃-∷∈-++ us g)
 good-∷∈-++ a (u ∷ us) vs (good-later good-us++vs) =
   good-later (good-∷∈-++ a us vs good-us++vs)
 
@@ -450,8 +449,9 @@ mutual
             (bld-∉ f bld a∉as)
             (cong (_∷_ a) as≡)
             (l-barw a)
-            (extend-bars (higman₂ w ws f bld as≡ l-barw l-bars)
-                         (bars-later l-bars))
+            (extend-bars {a , w ∷ [] , ws} {f}
+                         (Bar (w ∷ ws) ∋ higman₂ w ws f bld as≡ l-barw l-bars)
+                         (Bars f ∋ bars-later l-bars))
 
 --
 -- bars[]

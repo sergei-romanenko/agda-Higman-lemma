@@ -57,7 +57,8 @@ _≥∃?_ : (a : A) (as : List A) → Dec (a ≥∃ as)
 a ≥∃? as = any (_≥?_ a) as
 
 --
--- GoodW: "good" words.
+-- `GoodW as`: `as` is "good" if there is a repeated letter.
+--  Namely, as ≡ ... ∷ a′′ ∷ ... ∷ a′ ∷ ... ∷ [] and a′ ≡ a′′ .
 --
 
 data GoodW : Word → Set where
@@ -81,15 +82,15 @@ badW-later a≱∃as badw-a∷as (goodW-later good-as) =
   badw-a∷as good-as
 
 --
--- BarW
+-- `BarW as`: eventually any continuation of `as` becomes good.
 --
 
 data BarW : Word → Set where
-  nowW   : ∀ {as} (good-as : GoodW as) → BarW as
-  laterW : ∀ {as} (l-barw : ∀ a → BarW (a ∷ as)) → BarW as
+  barw-now   : ∀ {as} (good-as : GoodW as) → BarW as
+  barw-later : ∀ {as} (l-barw : ∀ a → BarW (a ∷ as)) → BarW as
 
 --
--- Homeomorphic embedding for words.
+-- Homeomorphic embedding of words.
 --
 
 infix 4 _⊵_
@@ -106,7 +107,8 @@ data _⊵_ : Word → Word → Set where
 ⊵[] (a ∷ w) = ⊵-drop (⊵[] w)
 
 --
--- Good
+-- `Good ws`: `ws` is "good" if
+--  ws ≡ ... ∷ w′′ ∷ ... ∷ w′ ∷ ... ∷ [] and w′′ ⊵ w′ .
 --
 
 _⊵∃_ : (w : Word) (ws : Seq) → Set
@@ -120,7 +122,8 @@ Bad : Seq → Set
 Bad ws = ¬ Good ws
 
 --
--- Bar
+-- Inductive bars (for sequences of words)
+-- `Bar ws`: eventually any continuation of `ws` becomes good.
 --
 
 data Bar : Seq → Set where
@@ -128,7 +131,8 @@ data Bar : Seq → Set where
   later : ∀ {ws} → (l-bar : ∀ w → Bar (w ∷ ws)) → Bar ws
 
 --
--- prop1
+-- In some papers this lemma is called "prop1".
+-- (A very expressiove and informative name...) :-)
 --
 
 bar[]∷ : ∀ ws → Bar([] ∷ ws)
@@ -145,33 +149,29 @@ data _⋐_ : (vs ws : Seq) → Set where
   ⋐-drop : ∀ {vs ws w} → vs ⋐ ws → vs ⋐ w ∷ ws
   ⋐-keep : ∀ {vs ws v} → vs ⋐ ws → v ∷ vs ⋐ v ∷ ws
 
-[]⋐ : ∀ ws → [] ⋐ ws
-[]⋐ [] = ⋐-[]
-[]⋐ (w ∷ ws) = ⋐-drop ([]⋐ ws)
-
 ⋐-refl : ∀ {ws} → ws ⋐ ws
 ⋐-refl {[]} = ⋐-[]
 ⋐-refl {w ∷ ws} = ⋐-keep ⋐-refl
 
--- Monotonicity of ⋐.
+-- The monotonicity of _⊵∃_ and Good with respect to _⋐_ .
 
-⋐-⊵∃-mono : ∀ {w vs ws} → vs ⋐ ws → w ⊵∃ vs → w ⊵∃ ws
-⋐-⊵∃-mono ⋐-[] ()
-⋐-⊵∃-mono (⋐-drop {vs} {ws} {v} ⋐-vs-ws) w⊵∃vs =
-  there (⋐-⊵∃-mono ⋐-vs-ws w⊵∃vs)
-⋐-⊵∃-mono (⋐-keep ⋐-vs-ws) (here w⊵v) =
-  here w⊵v
-⋐-⊵∃-mono (⋐-keep ⋐-vs-ws) (there w⊵∃vs) =
-  there (⋐-⊵∃-mono ⋐-vs-ws w⊵∃vs)
+⊵∃-mono : ∀ {w vs ws} → vs ⋐ ws → w ⊵∃ vs → w ⊵∃ ws
+⊵∃-mono ⋐-[] ()
+⊵∃-mono (⋐-drop {vs} {ws} {v} vs⋐) w⊵∃ =
+  there (⊵∃-mono vs⋐ w⊵∃)
+⊵∃-mono (⋐-keep vs⋐) (here w⊵) =
+  here w⊵
+⊵∃-mono (⋐-keep vs⋐) (there w⊵∃) =
+  there (⊵∃-mono vs⋐ w⊵∃)
 
-⋐-good-mono : ∀ {vs ws} → vs ⋐ ws → Good vs → Good ws
-⋐-good-mono ⋐-[] ()
-⋐-good-mono (⋐-drop ⋐-vs-ws) good-vs =
-  good-later (⋐-good-mono ⋐-vs-ws good-vs)
-⋐-good-mono (⋐-keep ⋐-vs-ws) (good-now w⊵∃vs) =
-  good-now (⋐-⊵∃-mono ⋐-vs-ws w⊵∃vs)
-⋐-good-mono (⋐-keep ⋐-vs-ws) (good-later good-vs) =
-  good-later (⋐-good-mono ⋐-vs-ws good-vs)
+good-mono : ∀ {vs ws} → vs ⋐ ws → Good vs → Good ws
+good-mono ⋐-[] ()
+good-mono (⋐-drop vs⋐) good-vs =
+  good-later (good-mono vs⋐ good-vs)
+good-mono (⋐-keep vs⋐) (good-now w⊵∃) =
+  good-now (⊵∃-mono vs⋐ w⊵∃)
+good-mono (⋐-keep vs⋐) (good-later good-vs) =
+  good-later (good-mono vs⋐ good-vs)
 
 --
 -- Sorted letter sequences
@@ -266,7 +266,8 @@ labels : (f : Forest) → List A
 labels f = List.map label f
 
 --
--- Building a forest from a word sequence.
+-- Updating forests.
+-- (This corresponds to Seisenberger's `insert-folder`.)
 --
 
 mutual
@@ -283,8 +284,15 @@ mutual
   ... | yes a≥∃ = ⟪ b , v , vs ⟫ update f a u a≥∃
   ... | no  a≱∃ = ⟪ b , v , vs ⟫ ((⟪ a , b ∷ v , u ∷ vs ⟫ f) ∷ f)
 
+-- Extending forests.
+
 extend : (a : A) (u : Word) (vs : Seq) (f : Forest) → Forest
 extend a u vs f = (⟪ a , [] , u ∷ vs ⟫ f) ∷ f
+
+--
+-- Building a forest from a word sequence.
+-- (Here Seisenberger defines a function, but we use a relation.)
+--
 
 data Build : Seq → Forest → Set where
   bld-[] : Build [] []
@@ -476,7 +484,7 @@ good∈forest→good {ws} {f} bld {r} r≪∃ good-r =
     Good vs
       ∼⟨ good-zip sorted-v ⟩
     Good (zip-seq v vs)
-      ∼⟨ ⋐-good-mono zip⋐ws ⟩
+      ∼⟨ good-mono zip⋐ws ⟩
     Good ws
     ∎
 
@@ -509,7 +517,8 @@ bld→bad-as (bld-≥ {a} {w} {ws} {f} bld a≥∃) refl good-as
   = bld→bad-as bld refl good-as
 
 --
--- Extending a forest with a new tree, while preserving the invariant `Bars f`.
+-- Extending a forest with a new tree, while preserving
+-- the invariant `Bars f`.
 --
 
 mutual
@@ -541,9 +550,9 @@ mutual
     bs ≡ labels f → BadW bs →
     BarW bs → Bar ws → Bars f →
     Bars (⟪ a , v , ws ⟫ f ∷ [])
-  bars∷[] bs≡ bad-bs (nowW good-bs) bar-ws bars-f =
+  bars∷[] bs≡ bad-bs (barw-now good-bs) bar-ws bars-f =
     ⊥-elim (bad-bs good-bs)
-  bars∷[] bs≡ bad-bs (laterW l-barw) bar-ws bars-f =
+  bars∷[] bs≡ bad-bs (barw-later l-barw) bar-ws bars-f =
     bars∷[]₁ bs≡ bad-bs l-barw bar-ws bars-f
 
   bars∷[]₁ : ∀ {a v ws f bs} →
@@ -594,9 +603,9 @@ mutual
   higman₀ : ∀ ws f →
     Build ws f → ∀ {as} → as ≡ labels f →
     BarW as → Bars f → Bar ws
-  higman₀ ws f bld as≡ (nowW good-as) bars-f =
+  higman₀ ws f bld as≡ (barw-now good-as) bars-f =
     ⊥-elim (bld→bad-as bld as≡ good-as)
-  higman₀ ws f bld as≡ (laterW l-barw) bars-f =
+  higman₀ ws f bld as≡ (barw-later l-barw) bars-f =
     higman₁ ws f bld as≡ l-barw bars-f
 
   -- If `Bars f` contains (a representation of) a good subsequence,
@@ -645,7 +654,7 @@ mutual
             (cong (_∷_ a) as≡)
             (l-barw a)
             (bars∷ (bars∷[] as≡ (bld→bad-as bld as≡)
-                            (laterW l-barw)
+                            (barw-later l-barw)
                             (higman₂ w ws f bld as≡ l-barw l-bars)
                             (bars-later l-bars))
                     (bars-later l-bars))
