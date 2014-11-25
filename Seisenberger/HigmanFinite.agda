@@ -29,7 +29,7 @@ open import Data.List as List
 open import Data.List.All as All
   using (All; []; _∷_)
 open import Data.List.Any as Any
-  using (Any; here; there; any; index; module Membership; module Membership-≡)
+  using (Any; here; there; any; module Membership; module Membership-≡)
 open import Data.Product as Prod
   using (_×_; _,_; proj₁; proj₂; Σ)
 open import Data.Sum as Sum
@@ -380,12 +380,15 @@ mutual
   extend-bars₁ l-bar (bars-now s∈f good-s) =
     bars-now (there s∈f) good-s
   extend-bars₁ {s} {f} l-bar (bars-later l-bars) =
-    bars-later helper
-    where helper : ∀ u {a} a∈ → Bars (update (s ∷ f) u a∈)
-          helper u (here a≡) =
-            extend-bars (l-bar u) (bars-later l-bars)
-          helper u (there a∈) =
-            extend-bars₁ l-bar (l-bars u a∈)
+    bars-later (extend-bars₂ l-bar l-bars)
+  extend-bars₂ : ∀ {s f} →
+    (∀ w → Bar (w ∷ seq₁++seq₂ s)) →
+    (∀ u {a} a∈ → Bars (update f u a∈)) →
+    (∀ u {a} a∈ → Bars (update (s ∷ f) u a∈))
+  extend-bars₂ l-bar l-bars u (here a≡) =
+    extend-bars (l-bar u) (bars-later l-bars)
+  extend-bars₂ l-bar l-bars u (there a∈) =
+    extend-bars₁ l-bar (l-bars u a∈)
 
 --
 -- Now we prove a generalization of Higman's lemma
@@ -458,9 +461,7 @@ mutual
 --
 
 bars[] : Bars []
-bars[] = bars-later helper
-  where helper : ∀ u {a} a∈ → Bars (update [] u a∈)
-        helper u ()
+bars[] = bars-later (λ u {a} → λ ())
 
 --
 -- higman
