@@ -19,10 +19,16 @@ open import Data.Bool
   using (Bool; true; false; _≟_; not)
 open import Data.Bool.Properties
   using (¬-not; not-¬)
-open import Data.List
-open import Data.Product
-open import Data.Sum
+open import Data.List as List
+  hiding (any; all)
+open import Data.List.Any as Any
+  using (Any; here; there; any; module Membership; module Membership-≡)
+open import Data.Product as Prod
+  using (_×_; _,_; proj₁; proj₂; Σ; ∃)
+open import Data.Sum as Sum
+  using (_⊎_; inj₁; inj₂)
 open import Data.Empty
+  using(⊥; ⊥-elim)
 
 open import Function
 
@@ -38,28 +44,34 @@ Letter : Set
 Letter = Bool
 
 Word = List Letter
+Seq = List Word
 
 -- The embedding relation on words is defined inductively.
--- Intuitively, a word xs can be embedded into a word ys,
--- if we can obtain xs by deleting letters from ys.
+-- Intuitively, a word `v` can be embedded into a word `w`,
+-- if we can obtain `v` by deleting letters from `w`.
 -- For example,
---   true ∷ true ∷ [] ⊴ false ∷ true ∷ false ∷ true ∷ []
+--   false ∷ true ∷ false ∷ true ∷ [] ⊵ true ∷ true ∷ []
 
-infix 4 _⊴_ _⊵∃_
+infix 4 _⊵_ _⊵∃_
 
-data _⊴_ : Word → Word → Set where
-  ⊴-[]   : ∀ {ys} → [] ⊴ ys
-  ⊴-drop : ∀ {xs ys y} → xs ⊴ ys → xs ⊴ y ∷ ys
-  ⊴-keep : ∀ {xs ys x} → xs ⊴ ys → x ∷ xs ⊴ x ∷ ys
+data _⊵_ : Word → Word → Set where
+  ⊵-[]   : [] ⊵ []
+  ⊵-drop : ∀ {w v a} → w ⊵ v → a ∷ w ⊵ v
+  ⊵-keep : ∀ {w v a} → w ⊵ v → a ∷ w ⊵ a ∷ v
+
+-- [] is embeddable in any word.
+
+⊵[] : ∀ w → w ⊵ []
+⊵[] [] = ⊵-[]
+⊵[] (a ∷ w) = ⊵-drop (⊵[] w)
 
 -- In order to formalize the notion of a good sequence,
 -- it is useful to define an auxiliary relation _⊵∃_.
 --   v ⊵∃ ws
--- means that ws contains a word w, such that w ⊴ v .
+-- means that ws contains a word w, such that v ⊵ w .
 
-data _⊵∃_ (v : Word) : List Word → Set where
-  ⊵∃-now   : ∀ {w ws} (n : w ⊴ v) → v ⊵∃ w ∷ ws
-  ⊵∃-later : ∀ {w ws} (l : v ⊵∃ ws) → v ⊵∃ w ∷ ws
+_⊵∃_ : (w : Word) (ws : Seq) → Set
+w ⊵∃ ws = Any (_⊵_ w) ws
 
 -- A list of words is good if its tail is either good
 -- or contains a word which can be embedded into the word
@@ -95,8 +107,7 @@ data Bar : List Word → Set where
 infixr 5 _∷∈_
 
 _∷∈_ : (a : Letter) (ws : List Word) → List Word
-a ∷∈ [] = []
-a ∷∈ (w ∷ ws) = (a ∷ w) ∷ a ∷∈ ws
+a ∷∈ ws = map (_∷_ a) ws
 
 -- `T a vs ws` means that vs is obtained from ws by
 -- (1) first copying the prefix of words starting with the letter b,
@@ -137,45 +148,45 @@ data T (a : Letter) : List Word → List Word → Set where
 --
 
 bar[]∷ : (ws : List Word) → Bar ([] ∷ ws)
-bar[]∷ ws = later (λ w → now (good-now (⊵∃-now ⊴-[])))
-
+bar[]∷ ws = later (λ w → now (good-now (here (⊵[] w))))
 
 -- Lemmas. w ⊵∃ ... → (a ∷ w) ⊵∃ ...
 
-∷⊵∃ : ∀ {a w ws} → w ⊵∃ ws → a ∷ w ⊵∃ ws
-∷⊵∃ (⊵∃-now n) = ⊵∃-now (⊴-drop n)
-∷⊵∃ (⊵∃-later l) = ⊵∃-later (∷⊵∃ l)
+⊵∃-drop : ∀ {ws a w} → w ⊵∃ ws → a ∷ w ⊵∃ ws
+⊵∃-drop (here w⊵) = here (⊵-drop w⊵)
+⊵∃-drop (there w⊵∃) = there (⊵∃-drop w⊵∃)
 
-∷⊵∃∷ : ∀ {a w ws} → w ⊵∃ ws → a ∷ w ⊵∃ a ∷∈ ws
-∷⊵∃∷ (⊵∃-now n) = ⊵∃-now (⊴-keep n)
-∷⊵∃∷ (⊵∃-later l) = ⊵∃-later (∷⊵∃∷ l)
+⊵∃-∷∈ : ∀ {ws a w} → w ⊵∃ ws → a ∷ w ⊵∃ a ∷∈ ws
+⊵∃-∷∈ {[]} ()
+⊵∃-∷∈ {_ ∷ _} (here w⊵) = here (⊵-keep w⊵)
+⊵∃-∷∈ {_ ∷ _} (there w⊵∃) = there (⊵∃-∷∈ w⊵∃)
 
-t∷⊵∃ : ∀ {a v vs ws} → T a vs ws → v ⊵∃ vs → a ∷ v ⊵∃ ws
-t∷⊵∃ (t-init a≢b) (⊵∃-now n) = ⊵∃-now (⊴-keep n)
-t∷⊵∃ (t-init a≢b) (⊵∃-later l) = ⊵∃-later (∷⊵∃ l)
-t∷⊵∃ (t-keep t) (⊵∃-now n) = ⊵∃-now (⊴-keep n)
-t∷⊵∃ (t-keep t) (⊵∃-later l) = ⊵∃-later (t∷⊵∃ t l)
-t∷⊵∃ (t-drop a≢b t) l = ⊵∃-later (t∷⊵∃ t l)
+t-⊵∃-drop : ∀ {a v vs ws} → T a vs ws → v ⊵∃ vs → a ∷ v ⊵∃ ws
+t-⊵∃-drop (t-init a≢b) (here v⊵) = here (⊵-keep v⊵)
+t-⊵∃-drop (t-init a≢b) (there v⊵∃) = there (⊵∃-drop v⊵∃)
+t-⊵∃-drop (t-keep t) (here v⊵) = here (⊵-keep v⊵)
+t-⊵∃-drop (t-keep t) (there v⊵∃) = there (t-⊵∃-drop t v⊵∃)
+t-⊵∃-drop (t-drop a≢b t) v⊵∃ = there (t-⊵∃-drop t v⊵∃)
 
 -- Lemmas. Good ... → Good ...
 
-good∷∈ : ∀ {a ws} → Good ws → Good (a ∷∈ ws)
-good∷∈ (good-now n) = good-now (∷⊵∃∷ n)
-good∷∈ (good-later l) = good-later (good∷∈ l)
+good-∷∈ : ∀ {a ws} → Good ws → Good (a ∷∈ ws)
+good-∷∈ (good-now n) = good-now (⊵∃-∷∈ n)
+good-∷∈ (good-later l) = good-later (good-∷∈ l)
 
-tGood : ∀ {a vs ws} → T a vs ws → Good vs → Good ws
-tGood (t-init a≢b) (good-now n) = good-now (∷⊵∃ n)
-tGood (t-init a≢b) (good-later l) = good-later l
-tGood (t-keep t) (good-now n) = good-now (t∷⊵∃ t n)
-tGood (t-keep t) (good-later l) = good-later (tGood t l)
-tGood (t-drop a≢b t) g = good-later (tGood t g)
+t-good : ∀ {a vs ws} → T a vs ws → Good vs → Good ws
+t-good (t-init a≢b) (good-now n) = good-now (⊵∃-drop n)
+t-good (t-init a≢b) (good-later l) = good-later l
+t-good (t-keep t) (good-now n) = good-now (t-⊵∃-drop t n)
+t-good (t-keep t) (good-later l) = good-later (t-good t l)
+t-good (t-drop a≢b t) g = good-later (t-good t g)
 
 -- Lemma. T a (...) (a ∷∈ ...)
 
-t∷∈ : ∀ a ws → T a ws (a ∷∈ ws)
-t∷∈ a [] = t-[]
-t∷∈ a (v ∷ []) = t-init (not-¬ refl)
-t∷∈ a (v ∷ w ∷ ws) = t-keep (t∷∈ a (w ∷ ws))
+t-∷∈ : ∀ a ws → T a ws (a ∷∈ ws)
+t-∷∈ a [] = t-[]
+t-∷∈ a (v ∷ []) = t-init (not-¬ refl)
+t-∷∈ a (v ∷ w ∷ ws) = t-keep (t-∷∈ a (w ∷ ws))
 
 --
 -- prop2 : Interleaving two trees
@@ -188,13 +199,13 @@ mutual
   ttBar : ∀ {zs a b xs ys} → a ≢ b → T a xs zs → T b ys zs →
             Bar xs → Bar ys → Bar zs
 
-  ttBar a≢b ta tb (now gx) by = now (tGood ta gx)
+  ttBar a≢b ta tb (now gx) by = now (t-good ta gx)
   ttBar a≢b ta tb (later lx) by = ttBar₁ a≢b ta tb lx by
 
   ttBar₁ : ∀ {zs a b xs ys} → a ≢ b → T a xs zs → T b ys zs →
              (∀ w → Bar (w ∷ xs)) → Bar ys → Bar zs
 
-  ttBar₁ a≢b ta tb lx (now gy) = now (tGood tb gy)
+  ttBar₁ a≢b ta tb lx (now gy) = now (t-good tb gy)
   ttBar₁ a≢b ta tb lx (later ly) = later (ttBar₂ a≢b ta tb lx ly)
 
   ttBar₂ : ∀ {zs a b xs ys} → a ≢ b → T a xs zs → T b ys zs →
@@ -236,7 +247,7 @@ mutual
 
   bar∷∈ : ∀ {a ws} → Bar ws → Bar (a ∷∈ ws)
 
-  bar∷∈ (now g) = now (good∷∈ g)
+  bar∷∈ (now g) = now (good-∷∈ g)
   bar∷∈ (later l) = later (bar∷∈₁ l)
 
   bar∷∈₁ : ∀ {a ws} → (∀ w → Bar (w ∷ ws)) → (∀ w → Bar (w ∷ a ∷∈ ws))
@@ -252,7 +263,7 @@ mutual
           (T b (v ∷ a ∷∈ ws) ((b ∷ v) ∷ a ∷∈ ws)
             ∋ t-init b≢a)
           (T a ws ((b ∷ v) ∷ a ∷∈ ws)
-            ∋ t-drop (≢-sym b≢a) (t∷∈ a ws))
+            ∋ t-drop (≢-sym b≢a) (t-∷∈ a ws))
           (Bar (v ∷ a ∷∈ ws)
             ∋ bar∷∈₁ l v)
           (Bar ws
