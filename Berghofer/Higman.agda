@@ -110,6 +110,7 @@ data T (a : Letter) : List Word → List Word → Set where
            (t : T a vs ws) → T a (v ∷ vs) ((a ∷ v) ∷ ws)
   t-drop : ∀ {v vs ws b} → (a≢b : a ≢ b) →
            (t : T a vs ws) → T a vs ((b ∷ v) ∷ ws)
+  t-[]   : T a [] []  -- This rule ensures that `T a ws (a ∷∈ ws)` for all `ws`.
 
 -- Auxiliaries
 
@@ -171,10 +172,10 @@ tGood (t-drop a≢b t) g = good-later (tGood t g)
 
 -- Lemma. T a (...) (a ∷∈ ...)
 
-t∷∈ : ∀ a ws → ws ≢ [] → T a ws (a ∷∈ ws)
-t∷∈ a [] ws≢[] = ⊥-elim (ws≢[] refl)
-t∷∈ a (v ∷ []) ws≢[] = t-init (not-¬ refl)
-t∷∈ a (v ∷ w ∷ ws) ws≢[] = t-keep (t∷∈ a (w ∷ ws) (λ ()))
+t∷∈ : ∀ a ws → T a ws (a ∷∈ ws)
+t∷∈ a [] = t-[]
+t∷∈ a (v ∷ []) = t-init (not-¬ refl)
+t∷∈ a (v ∷ w ∷ ws) = t-keep (t∷∈ a (w ∷ ws))
 
 --
 -- prop2 : Interleaving two trees
@@ -233,28 +234,27 @@ mutual
 
 mutual
 
-  bar∷∈ : ∀ {a ws} → ws ≢ [] → Bar ws → Bar (a ∷∈ ws)
+  bar∷∈ : ∀ {a ws} → Bar ws → Bar (a ∷∈ ws)
 
-  bar∷∈ ws≢[] (now g) = now (good∷∈ g)
-  bar∷∈ ws≢[] (later l) = later (bar∷∈₁ ws≢[] l)
+  bar∷∈ (now g) = now (good∷∈ g)
+  bar∷∈ (later l) = later (bar∷∈₁ l)
 
-  bar∷∈₁ : ∀ {a ws} → ws ≢ [] →
-             (∀ w → Bar (w ∷ ws)) → (∀ w → Bar (w ∷ a ∷∈ ws))
+  bar∷∈₁ : ∀ {a ws} → (∀ w → Bar (w ∷ ws)) → (∀ w → Bar (w ∷ a ∷∈ ws))
 
-  bar∷∈₁ {a} {ws} ws≢[] l [] = bar[]∷ (a ∷∈ ws)
-  bar∷∈₁ {a} {ws} ws≢[] l (b ∷ v) with b ≟ a
+  bar∷∈₁ {a} {ws} l [] = bar[]∷ (a ∷∈ ws)
+  bar∷∈₁ {a} {ws} l (b ∷ v) with b ≟ a
   ... | yes b≡a rewrite b≡a =
     Bar (a ∷∈ (v ∷ ws)) ∋
-    bar∷∈ (λ ()) (l v)
+    bar∷∈ (l v)
   ... | no  b≢a =
     Bar ((b ∷ v) ∷ a ∷∈ ws) ∋
     ttBar b≢a
           (T b (v ∷ a ∷∈ ws) ((b ∷ v) ∷ a ∷∈ ws)
             ∋ t-init b≢a)
           (T a ws ((b ∷ v) ∷ a ∷∈ ws)
-            ∋ t-drop (≢-sym b≢a) (t∷∈ a ws ws≢[]))
+            ∋ t-drop (≢-sym b≢a) (t∷∈ a ws))
           (Bar (v ∷ a ∷∈ ws)
-            ∋ bar∷∈₁ ws≢[] l v)
+            ∋ bar∷∈₁ l v)
           (Bar ws
             ∋ later l)
 
@@ -265,7 +265,7 @@ mutual
 
 higman′ :  ∀ w → Bar (w ∷ [])
 higman′ [] = bar[]∷ []
-higman′ (c ∷ cs) = bar∷∈ (λ ()) (higman′ cs)
+higman′ (c ∷ cs) = bar∷∈ (higman′ cs)
 
 higman : Bar []
 higman = later higman′
