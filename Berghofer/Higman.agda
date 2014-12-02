@@ -18,7 +18,7 @@ open import Data.Nat
 open import Data.Bool
   using (Bool; true; false; _≟_; not)
 open import Data.Bool.Properties
-  using (¬-not; not-¬)
+  using (not-¬)
 open import Data.List as List
   hiding (any; all)
 open import Data.List.Any as Any
@@ -123,16 +123,18 @@ data T (a : Letter) : List Word → List Word → Set where
            (t : T a vs ws) → T a vs ((b ∷ v) ∷ ws)
   t-[]   : T a [] []  -- This rule ensures that `T a ws (a ∷∈ ws)` for all `ws`.
 
--- Auxiliaries
+--
+-- Dirichlet's (pigeonhole) principle for 2 holes.
+--
 
-≢-sym : ∀ {ℓ} {A : Set ℓ} {x y : A} → x ≢ y → y ≢ x
-≢-sym x≢y y≡x = x≢y (sym y≡x)
+dirichlet2 : ∀ {a b : Letter} → a ≢ b → ∀ c → c ≡ a ⊎ c ≡ b
 
-≢-trans : ∀ {x y z : Letter} →
-            x ≢ y → y ≢ z → x ≡ z
-≢-trans  {x} {y} {z} x≢y y≢z = begin
-  x ≡⟨ ¬-not x≢y ⟩ not y ≡⟨ sym (¬-not (≢-sym y≢z)) ⟩ z ∎
-  where open ≡-Reasoning
+dirichlet2 {true}  {true}  a≢b c = ⊥-elim (a≢b refl)
+dirichlet2 {false} {false} a≢b c = ⊥-elim (a≢b refl)
+dirichlet2 {true}  {false} a≢b true  = inj₁ refl
+dirichlet2 {true}  {false} a≢b false = inj₂ refl
+dirichlet2 {false} {true}  a≢b false = inj₁ refl
+dirichlet2 {false} {true}  a≢b true  = inj₂ refl
 
 --
 -- The proof of Higman’s lemma is divided into several parts, namely
@@ -147,8 +149,8 @@ data T (a : Letter) : List Word → List Word → Set where
 -- by appending any word.
 --
 
-bar[]∷ : (ws : List Word) → Bar ([] ∷ ws)
-bar[]∷ ws = later (λ w → now (good-now (here (⊵[] w))))
+bar-[]∷ : (ws : List Word) → Bar ([] ∷ ws)
+bar-[]∷ ws = later (λ w → now (good-now (here (⊵[] w))))
 
 -- Lemmas. w ⊵∃ ... → (a ∷ w) ⊵∃ ...
 
@@ -212,20 +214,20 @@ mutual
              (∀ w → Bar (w ∷ xs)) → (∀ w → Bar (w ∷ ys)) →
              (∀ w → Bar (w ∷ zs))
 
-  ttBar₂ {zs} a≢b ta tb lx ly [] = bar[]∷ zs
-  ttBar₂ {zs} {a} {b} {xs} {ys} a≢b ta tb lx ly (c ∷ v) with c ≟ a
-  ... | yes c≡a rewrite c≡a =
+  ttBar₂ {zs} a≢b ta tb lx ly [] = bar-[]∷ zs
+  ttBar₂ {zs} {a} {b} {xs} {ys} a≢b ta tb lx ly (c ∷ v) with dirichlet2 a≢b c
+  ... | inj₁ c≡a rewrite c≡a =
     Bar ((a ∷ v) ∷ zs) ∋
     ttBar a≢b
           (T a (v ∷ xs) ((a ∷ v) ∷ zs)
             ∋ t-keep ta)
           (T b ys ((a ∷ v) ∷ zs)
-            ∋ t-drop (≢-sym a≢b) tb)
+            ∋ t-drop (a≢b ∘ sym) tb)
           ({- Bar (v ∷ xs)
             ∋ -} lx v)
           (Bar ys
             ∋ later ly)
-  ... | no  c≢a rewrite c ≡ b ∋ ≢-trans c≢a a≢b =
+  ... | inj₂  c≡b rewrite c≡b =
     Bar ((b ∷ v) ∷ zs) ∋
     ttBar₁ a≢b
            (T a xs ((b ∷ v) ∷ zs)
@@ -241,31 +243,31 @@ mutual
 --
 -- prop3 : Lifting to longer words
 --
--- Proof idea: Induction on Bar xs, then induction on first word following zs
+-- Proof idea: Induction on Bar ws, then induction on first word following ws
 
 mutual
 
-  bar∷∈ : ∀ {a ws} → Bar ws → Bar (a ∷∈ ws)
+  bar-∷∈ : ∀ {a ws} → Bar ws → Bar (a ∷∈ ws)
 
-  bar∷∈ (now g) = now (good-∷∈ g)
-  bar∷∈ (later l) = later (bar∷∈₁ l)
+  bar-∷∈ (now g) = now (good-∷∈ g)
+  bar-∷∈ (later l) = later (bar-∷∈₁ l)
 
-  bar∷∈₁ : ∀ {a ws} → (∀ w → Bar (w ∷ ws)) → (∀ w → Bar (w ∷ a ∷∈ ws))
+  bar-∷∈₁ : ∀ {a ws} → (∀ w → Bar (w ∷ ws)) → (∀ w → Bar (w ∷ a ∷∈ ws))
 
-  bar∷∈₁ {a} {ws} l [] = bar[]∷ (a ∷∈ ws)
-  bar∷∈₁ {a} {ws} l (b ∷ v) with b ≟ a
+  bar-∷∈₁ {a} {ws} l [] = bar-[]∷ (a ∷∈ ws)
+  bar-∷∈₁ {a} {ws} l (b ∷ v) with b ≟ a
   ... | yes b≡a rewrite b≡a =
     Bar (a ∷∈ (v ∷ ws)) ∋
-    bar∷∈ (l v)
+    bar-∷∈ (l v)
   ... | no  b≢a =
     Bar ((b ∷ v) ∷ a ∷∈ ws) ∋
     ttBar b≢a
           (T b (v ∷ a ∷∈ ws) ((b ∷ v) ∷ a ∷∈ ws)
             ∋ t-init b≢a)
           (T a ws ((b ∷ v) ∷ a ∷∈ ws)
-            ∋ t-drop (≢-sym b≢a) (t-∷∈ a ws))
+            ∋ t-drop (b≢a ∘ sym) (t-∷∈ a ws))
           (Bar (v ∷ a ∷∈ ws)
-            ∋ bar∷∈₁ l v)
+            ∋ bar-∷∈₁ l v)
           (Bar ws
             ∋ later l)
 
@@ -275,8 +277,8 @@ mutual
 --
 
 higman′ :  ∀ w → Bar (w ∷ [])
-higman′ [] = bar[]∷ []
-higman′ (c ∷ cs) = bar∷∈ (higman′ cs)
+higman′ [] = bar-[]∷ []
+higman′ (c ∷ cs) = bar-∷∈ (higman′ cs)
 
 higman : Bar []
 higman = later higman′
