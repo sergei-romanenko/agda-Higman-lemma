@@ -21,8 +21,6 @@ open import Data.Bool.Properties
   using (not-¬)
 open import Data.List as List
   hiding (any; all)
-open import Data.List.Any as Any
-  using (Any; here; there; any; module Membership; module Membership-≡)
 open import Data.Product as Prod
   using (_×_; _,_; proj₁; proj₂; Σ; ∃)
 open import Data.Sum as Sum
@@ -52,34 +50,35 @@ Seq = List Word
 -- For example,
 --   false ∷ true ∷ false ∷ true ∷ [] ⊵ true ∷ true ∷ []
 
-infix 4 _⊵_ _⊵∃_
+infix 4 _⊴_ _∋⊴_
 
-data _⊵_ : Word → Word → Set where
-  ⊵-[]   : [] ⊵ []
-  ⊵-drop : ∀ {w v a} → w ⊵ v → a ∷ w ⊵ v
-  ⊵-keep : ∀ {w v a} → w ⊵ v → a ∷ w ⊵ a ∷ v
+data _⊴_ : (v w : Word) → Set where
+  ⊴-[]   : [] ⊴ []
+  ⊴-drop : ∀ {v w a} → v ⊴ w → v ⊴ a ∷ w
+  ⊴-keep : ∀ {v w a} → v ⊴ w → a ∷ v ⊴ a ∷ w
 
 -- [] is embeddable in any word.
 
-⊵[] : ∀ w → w ⊵ []
-⊵[] [] = ⊵-[]
-⊵[] (a ∷ w) = ⊵-drop (⊵[] w)
+[]⊴ : ∀ w → [] ⊴ w
+[]⊴ [] = ⊴-[]
+[]⊴ (a ∷ w) = ⊴-drop ([]⊴ w)
 
 -- In order to formalize the notion of a good sequence,
 -- it is useful to define an auxiliary relation _⊵∃_.
---   v ⊵∃ ws
--- means that ws contains a word w, such that v ⊵ w .
+--   ws ∋⊴ v
+-- means that ws contains a word w, such that w ⊴ v .
 
-_⊵∃_ : (w : Word) (ws : Seq) → Set
-w ⊵∃ ws = Any (_⊵_ w) ws
+data _∋⊴_ : (ws : Seq) (v : Word) → Set where
+  here  : ∀ {w ws v} (w⊴v : w ⊴ v) → w ∷ ws ∋⊴ v
+  there : ∀ {w ws v} (ws∋⊴v : ws ∋⊴ v) → w ∷ ws ∋⊴ v
 
 -- A list of words is good if its tail is either good
 -- or contains a word which can be embedded into the word
 -- occurring at the head position of the list.
 
-data Good : List Word → Set where
-  good-now   : ∀ {ws w} (n : w ⊵∃ ws) → Good (w ∷ ws)
-  good-later : ∀ {ws w} (l : Good ws) → Good (w ∷ ws)
+data Good : (ws : List Word) → Set where
+  here  : ∀ {ws w} (ws∋⊴w : ws ∋⊴ w) → Good (w ∷ ws)
+  there : ∀ {ws w} (good-ws : Good ws) → Good (w ∷ ws)
 
 -- In order to express the fact that every infinite sequence is good,
 -- we define a predicate Bar.
@@ -101,20 +100,20 @@ data Bar : List Word → Set where
 -- (Note that the above definition of Bar is closely related to
 -- Brouwer’s more general principle of bar induction.)
 
-
 -- The following function adds a letter to each word in a word list. 
 
 infixr 5 _∷∈_
 
 _∷∈_ : (a : Letter) (ws : List Word) → List Word
-a ∷∈ ws = map (_∷_ a) ws
+a ∷∈ [] = []
+a ∷∈ w ∷ ws = (a ∷ w) ∷ a ∷∈ ws
 
 -- `T a vs ws` means that vs is obtained from ws by
 -- (1) first copying the prefix of words starting with the letter b,
 --     where a ≢ b, and
 -- (2) then appending the tails of words starting with a.
 
-data T (a : Letter) : List Word → List Word → Set where
+data T (a : Letter) : (vs ws : List Word) → Set where
   t-init : ∀ {v ws b} → (a≢b : a ≢ b) →
            T a (v ∷ b ∷∈ ws) ((a ∷ v) ∷ b ∷∈ ws)
   t-keep : ∀ {v vs ws} →
@@ -150,45 +149,46 @@ dirichlet2 {false} {true}  a≢b true  = inj₂ refl
 --
 
 bar-[]∷ : (ws : List Word) → Bar ([] ∷ ws)
-bar-[]∷ ws = later (λ w → now (good-now (here (⊵[] w))))
+bar-[]∷ ws = later (λ w → now (here (here ([]⊴ w))))
 
 -- Lemmas. w ⊵∃ ... → (a ∷ w) ⊵∃ ...
 
-⊵∃-drop : ∀ {ws a w} → w ⊵∃ ws → a ∷ w ⊵∃ ws
-⊵∃-drop (here w⊵) = here (⊵-drop w⊵)
-⊵∃-drop (there w⊵∃) = there (⊵∃-drop w⊵∃)
+∋⊴-drop : ∀ {ws a v} → ws ∋⊴ v → ws ∋⊴ a ∷ v
+∋⊴-drop (here w⊴v) = here (⊴-drop w⊴v)
+∋⊴-drop (there ws∋⊴v) = there (∋⊴-drop ws∋⊴v)
 
-⊵∃-∷∈ : ∀ {ws a w} → w ⊵∃ ws → a ∷ w ⊵∃ a ∷∈ ws
-⊵∃-∷∈ {[]} ()
-⊵∃-∷∈ {_ ∷ _} (here w⊵) = here (⊵-keep w⊵)
-⊵∃-∷∈ {_ ∷ _} (there w⊵∃) = there (⊵∃-∷∈ w⊵∃)
+∋⊴-∷∈ : ∀ {ws a v} → ws ∋⊴ v → a ∷∈ ws ∋⊴ a ∷ v
+∋⊴-∷∈ (here w⊴v) = here (⊴-keep w⊴v)
+∋⊴-∷∈ (there ws∋⊴v) = there (∋⊴-∷∈ ws∋⊴v)
 
-t-⊵∃-drop : ∀ {a v vs ws} → T a vs ws → v ⊵∃ vs → a ∷ v ⊵∃ ws
-t-⊵∃-drop (t-init a≢b) (here v⊵) = here (⊵-keep v⊵)
-t-⊵∃-drop (t-init a≢b) (there v⊵∃) = there (⊵∃-drop v⊵∃)
-t-⊵∃-drop (t-keep t) (here v⊵) = here (⊵-keep v⊵)
-t-⊵∃-drop (t-keep t) (there v⊵∃) = there (t-⊵∃-drop t v⊵∃)
-t-⊵∃-drop (t-drop a≢b t) v⊵∃ = there (t-⊵∃-drop t v⊵∃)
+t-∋⊴-drop : ∀ {a v vs ws} → T a vs ws → vs ∋⊴ v → ws ∋⊴ a ∷ v
+t-∋⊴-drop (t-init a≢b) (here w⊴v) = here (⊴-keep w⊴v)
+t-∋⊴-drop (t-init a≢b) (there vs∋⊴v) = there (∋⊴-drop vs∋⊴v)
+t-∋⊴-drop (t-keep t) (here w⊴v) = here (⊴-keep w⊴v)
+t-∋⊴-drop (t-keep t) (there vs∋⊴v) = there (t-∋⊴-drop t vs∋⊴v)
+t-∋⊴-drop (t-drop a≢b t) vs∋⊴v = there (t-∋⊴-drop t vs∋⊴v)
+t-∋⊴-drop t-[] ()
 
 -- Lemmas. Good ... → Good ...
 
 good-∷∈ : ∀ {a ws} → Good ws → Good (a ∷∈ ws)
-good-∷∈ (good-now n) = good-now (⊵∃-∷∈ n)
-good-∷∈ (good-later l) = good-later (good-∷∈ l)
+good-∷∈ (here ws∋⊴w) = here (∋⊴-∷∈ ws∋⊴w)
+good-∷∈ (there good-ws) = there (good-∷∈ good-ws)
 
 t-good : ∀ {a vs ws} → T a vs ws → Good vs → Good ws
-t-good (t-init a≢b) (good-now n) = good-now (⊵∃-drop n)
-t-good (t-init a≢b) (good-later l) = good-later l
-t-good (t-keep t) (good-now n) = good-now (t-⊵∃-drop t n)
-t-good (t-keep t) (good-later l) = good-later (t-good t l)
-t-good (t-drop a≢b t) g = good-later (t-good t g)
+t-good (t-init a≢b) (here b-ws∋⊴v) = here (∋⊴-drop b-ws∋⊴v)
+t-good (t-init a≢b) (there good-b-vs) = there good-b-vs
+t-good (t-keep t) (here vs∋⊴v) = here (t-∋⊴-drop t vs∋⊴v)
+t-good (t-keep t) (there good-vs) = there (t-good t good-vs)
+t-good (t-drop a≢b t) good-vs = there (t-good t good-vs)
+t-good t-[] ()
 
 -- Lemma. T a (...) (a ∷∈ ...)
 
-t-∷∈ : ∀ a ws → T a ws (a ∷∈ ws)
+t-∷∈ : ∀ a vs → T a vs (a ∷∈ vs)
 t-∷∈ a [] = t-[]
 t-∷∈ a (v ∷ []) = t-init (not-¬ refl)
-t-∷∈ a (v ∷ w ∷ ws) = t-keep (t-∷∈ a (w ∷ ws))
+t-∷∈ a (v ∷ w ∷ vs) = t-keep (t-∷∈ a (w ∷ vs))
 
 --
 -- prop2 : Interleaving two trees
