@@ -182,7 +182,7 @@ module HigmanFin (n : ℕ) where
   -- the termination check.
   -- We need to add a "decreasing" argument!
 
-  {-# NO_TERMINATION_CHECK #-}
+  {-# NON_TERMINATING #-}
   barW₀-bad : ∀ a as → BarW (a ∷ as)
   barW₀-bad a as with a ∈? as
   ... | yes a∈as = barW-now (goodW-now a∈as)

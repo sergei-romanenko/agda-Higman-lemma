@@ -15,8 +15,8 @@ Computer Science and Statistics
 
 This version is compatible with
 
-* Agda 2.4.2
-* The Standard Library 0.8.1
+* Agda 2.5.2
+* The Standard Library 0.13
 
 Note that the implementation in Agda is complete. Namely, it contains
 a proof of the lemma **`good∈folder→good`**. This lemma corresponds to

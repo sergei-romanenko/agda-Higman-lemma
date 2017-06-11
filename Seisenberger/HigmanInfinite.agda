@@ -580,9 +580,10 @@ mutual
       Bars (⟪ a , v , ws ⟫ update f b w b≥∃ ∷ []) ∋
       bars∷[]₂ (bs≡→bs≡upd f b w b≥∃ bs≡)
                bad-bs l-barw l-bar (l-bars w b≥∃)
-    ... | no  b≱∃ rewrite sym $ bs≡ =
+    ... | no  b≱∃ =
       Bars (⟪ a , v , ws ⟫ (⟪ b , a ∷ v , w ∷ ws ⟫ f ∷ f) ∷ []) ∋
-      bars∷[] (cong (_∷_ b) bs≡) (badW-later b≱∃ bad-bs)
+      bars∷[] (cong (_∷_ b) bs≡)
+              (badW-later (λ b≥∃ → b≱∃ (subst (_≥∃_ b) bs≡ b≥∃)) bad-bs)
               (l-barw b) (later l-bar)
               (bars∷ (bars∷[]₁ bs≡ bad-bs
                                l-barw (l-bar w) (bars-later l-bars))
