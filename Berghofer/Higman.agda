@@ -16,19 +16,16 @@ module Higman where
 open import Data.Nat
   using (ℕ; zero; suc)
 open import Data.Bool
-  using (Bool; true; false; _≟_; not)
-open import Data.Bool.Properties
-  using (not-¬)
+  using (Bool; true; false)
 open import Data.List as List
   hiding (any; all)
 open import Data.Product as Prod
   using (_×_; _,_; proj₁; proj₂; Σ; ∃)
 open import Data.Sum as Sum
   using (_⊎_; inj₁; inj₂)
-open import Data.Empty
-  using(⊥; ⊥-elim)
 
 open import Function
+  using (_$_; _∋_)
 
 open import Relation.Nullary
 open import Relation.Binary
@@ -88,7 +85,7 @@ data Good : (ws : List Word) → Set where
 -- (2) successively adding words will turn it into a good list.
 
 data Bar : List Word → Set where
-  now   : ∀ {ws} (g : Good ws) → Bar ws
+  now   : ∀ {ws} (n : Good ws) → Bar ws
   later : ∀ {ws} (l : ∀ w → Bar (w ∷ ws)) → Bar ws
 
 -- Consequently,
@@ -108,32 +105,47 @@ _∷∈_ : (a : Letter) (ws : List Word) → List Word
 a ∷∈ [] = []
 a ∷∈ w ∷ ws = (a ∷ w) ∷ a ∷∈ ws
 
+-- Inequality of letters.
+
+infix 4 _<>_
+
+data _<>_ : (a b : Letter) → Set where
+  f<>t : false <> true
+  t<>f : true <> false
+
+<>-sym : ∀ {a b} → a <> b → b <> a
+<>-sym f<>t = t<>f
+<>-sym t<>f = f<>t
+
+≡⊎<> : ∀ a b → a ≡ b ⊎ a <> b
+≡⊎<> false false = inj₁ refl
+≡⊎<> false true = inj₂ f<>t
+≡⊎<> true false = inj₂ t<>f
+≡⊎<> true true = inj₁ refl
+
+--
+-- Dirichlet's (pigeonhole) principle for 2 holes.
+--
+
+dirichlet2 : ∀ {a b} → a <> b → ∀ c → c ≡ a ⊎ c ≡ b
+dirichlet2 f<>t false = inj₁ refl
+dirichlet2 f<>t true  = inj₂ refl
+dirichlet2 t<>f false = inj₂ refl
+dirichlet2 t<>f true  = inj₁ refl
+
 -- `T a vs ws` means that vs is obtained from ws by
 -- (1) first copying the prefix of words starting with the letter b,
 --     where a ≢ b, and
 -- (2) then appending the tails of words starting with a.
 
 data T (a : Letter) : (vs ws : List Word) → Set where
-  t-init : ∀ {v ws b} → (a≢b : a ≢ b) →
+  t-init : ∀ {v ws b} → (a<>b : a <> b) →
            T a (v ∷ b ∷∈ ws) ((a ∷ v) ∷ b ∷∈ ws)
   t-keep : ∀ {v vs ws} →
            (t : T a vs ws) → T a (v ∷ vs) ((a ∷ v) ∷ ws)
-  t-drop : ∀ {v vs ws b} → (a≢b : a ≢ b) →
+  t-drop : ∀ {v vs ws b} → (a<>b : a <> b) →
            (t : T a vs ws) → T a vs ((b ∷ v) ∷ ws)
   t-[]   : T a [] []  -- This rule ensures that `T a ws (a ∷∈ ws)` for all `ws`.
-
---
--- Dirichlet's (pigeonhole) principle for 2 holes.
---
-
-dirichlet2 : ∀ {a b : Letter} → a ≢ b → ∀ c → c ≡ a ⊎ c ≡ b
-
-dirichlet2 {true}  {true}  a≢b c = ⊥-elim (a≢b refl)
-dirichlet2 {false} {false} a≢b c = ⊥-elim (a≢b refl)
-dirichlet2 {true}  {false} a≢b true  = inj₁ refl
-dirichlet2 {true}  {false} a≢b false = inj₂ refl
-dirichlet2 {false} {true}  a≢b false = inj₁ refl
-dirichlet2 {false} {true}  a≢b true  = inj₂ refl
 
 --
 -- The proof of Higman’s lemma is divided into several parts, namely
@@ -162,11 +174,11 @@ bar-[]∷ ws = later (λ w → now (here (here ([]⊴ w))))
 ∋⊴-∷∈ (there ws∋⊴v) = there (∋⊴-∷∈ ws∋⊴v)
 
 t-∋⊴-drop : ∀ {a v vs ws} → T a vs ws → vs ∋⊴ v → ws ∋⊴ a ∷ v
-t-∋⊴-drop (t-init a≢b) (here w⊴v) = here (⊴-keep w⊴v)
-t-∋⊴-drop (t-init a≢b) (there vs∋⊴v) = there (∋⊴-drop vs∋⊴v)
-t-∋⊴-drop (t-keep t) (here w⊴v) = here (⊴-keep w⊴v)
-t-∋⊴-drop (t-keep t) (there vs∋⊴v) = there (t-∋⊴-drop t vs∋⊴v)
-t-∋⊴-drop (t-drop a≢b t) vs∋⊴v = there (t-∋⊴-drop t vs∋⊴v)
+t-∋⊴-drop (t-init a<>b) (here ⊴v) = here (⊴-keep ⊴v)
+t-∋⊴-drop (t-init a<>b) (there ∋⊴v) = there (∋⊴-drop ∋⊴v)
+t-∋⊴-drop (t-keep t) (here ⊴v) = here (⊴-keep ⊴v)
+t-∋⊴-drop (t-keep t) (there ∋⊴v) = there (t-∋⊴-drop t ∋⊴v)
+t-∋⊴-drop (t-drop a<>b t) ∋⊴v = there (t-∋⊴-drop t ∋⊴v)
 t-∋⊴-drop t-[] ()
 
 -- Lemmas. Good ... → Good ...
@@ -176,19 +188,18 @@ good-∷∈ (here ws∋⊴w) = here (∋⊴-∷∈ ws∋⊴w)
 good-∷∈ (there good-ws) = there (good-∷∈ good-ws)
 
 t-good : ∀ {a vs ws} → T a vs ws → Good vs → Good ws
-t-good (t-init a≢b) (here b-ws∋⊴v) = here (∋⊴-drop b-ws∋⊴v)
-t-good (t-init a≢b) (there good-b-vs) = there good-b-vs
+t-good (t-init a<>b) (here b-ws∋⊴v) = here (∋⊴-drop b-ws∋⊴v)
+t-good (t-init a<>b) (there good-b-vs) = there good-b-vs
 t-good (t-keep t) (here vs∋⊴v) = here (t-∋⊴-drop t vs∋⊴v)
 t-good (t-keep t) (there good-vs) = there (t-good t good-vs)
-t-good (t-drop a≢b t) good-vs = there (t-good t good-vs)
+t-good (t-drop a<>b t) good-vs = there (t-good t good-vs)
 t-good t-[] ()
 
 -- Lemma. T a (...) (a ∷∈ ...)
 
 t-∷∈ : ∀ a vs → T a vs (a ∷∈ vs)
 t-∷∈ a [] = t-[]
-t-∷∈ a (v ∷ []) = t-init (not-¬ refl)
-t-∷∈ a (v ∷ w ∷ vs) = t-keep (t-∷∈ a (w ∷ vs))
+t-∷∈ a (x ∷ xs) = t-keep (t-∷∈ a xs)
 
 --
 -- prop2 : Interleaving two trees
@@ -198,46 +209,35 @@ t-∷∈ a (v ∷ w ∷ vs) = t-keep (t-∷∈ a (w ∷ vs))
 
 mutual
 
-  ttBar : ∀ {zs a b xs ys} → a ≢ b → T a xs zs → T b ys zs →
+  ttBar : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
             Bar xs → Bar ys → Bar zs
+  ttBar a<>b ta tb (now nx) bar-ys = now (t-good ta nx)
+  ttBar a<>b ta tb (later lx) bar-ys = ttBar₁ a<>b ta tb lx bar-ys
 
-  ttBar a≢b ta tb (now gx) by = now (t-good ta gx)
-  ttBar a≢b ta tb (later lx) by = ttBar₁ a≢b ta tb lx by
-
-  ttBar₁ : ∀ {zs a b xs ys} → a ≢ b → T a xs zs → T b ys zs →
+  ttBar₁ : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
              (∀ w → Bar (w ∷ xs)) → Bar ys → Bar zs
+  ttBar₁ a<>b ta tb lx (now nx) = now (t-good tb nx)
+  ttBar₁ a<>b ta tb lx (later ly) = later (ttBar₂ a<>b ta tb lx ly)
 
-  ttBar₁ a≢b ta tb lx (now gy) = now (t-good tb gy)
-  ttBar₁ a≢b ta tb lx (later ly) = later (ttBar₂ a≢b ta tb lx ly)
-
-  ttBar₂ : ∀ {zs a b xs ys} → a ≢ b → T a xs zs → T b ys zs →
+  ttBar₂ : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
              (∀ w → Bar (w ∷ xs)) → (∀ w → Bar (w ∷ ys)) →
              (∀ w → Bar (w ∷ zs))
-
-  ttBar₂ {zs} a≢b ta tb lx ly [] = bar-[]∷ zs
-  ttBar₂ {zs} {a} {b} {xs} {ys} a≢b ta tb lx ly (c ∷ v) with dirichlet2 a≢b c
+  ttBar₂ {zs} a<>b ta tb lx ly [] = bar-[]∷ zs
+  ttBar₂ {zs}  {a} {b} {xs} {ys} a<>b ta tb lx ly (c ∷ v) with dirichlet2 a<>b c
   ... | inj₁ c≡a rewrite c≡a =
     Bar ((a ∷ v) ∷ zs) ∋
-    ttBar a≢b
-          (T a (v ∷ xs) ((a ∷ v) ∷ zs)
-            ∋ t-keep ta)
-          (T b ys ((a ∷ v) ∷ zs)
-            ∋ t-drop (a≢b ∘ sym) tb)
-          ({- Bar (v ∷ xs)
-            ∋ -} lx v)
-          (Bar ys
-            ∋ later ly)
-  ... | inj₂  c≡b rewrite c≡b =
+    ttBar a<>b ta′ tb′ (lx v) (later ly)
+    where ta′ : T a (v ∷ xs) ((a ∷ v) ∷ zs)
+          ta′ = t-keep ta
+          tb′ : T b ys ((a ∷ v) ∷ zs)
+          tb′ = t-drop (<>-sym $ a<>b) tb
+  ... | inj₂ c≡b rewrite c≡b =
     Bar ((b ∷ v) ∷ zs) ∋
-    ttBar₁ a≢b
-           (T a xs ((b ∷ v) ∷ zs)
-             ∋ t-drop a≢b ta)
-           (T b (v ∷ ys) ((b ∷ v) ∷ zs)
-             ∋ t-keep tb)
-           ({- (∀ w → Bar (w ∷ xs))
-             ∋ -} lx)
-           ({- Bar (v ∷ ys)
-             ∋ -} ly v)
+    ttBar₁ a<>b ta′ tb′ lx (ly v)
+    where ta′ : T a xs ((b ∷ v) ∷ zs)
+          ta′ = t-drop a<>b ta
+          tb′ : T b (v ∷ ys) ((b ∷ v) ∷ zs)
+          tb′ = t-keep tb
 
 
 --
@@ -245,32 +245,26 @@ mutual
 --
 -- Proof idea: Induction on Bar ws, then induction on first word following ws
 
+
 mutual
 
   bar-∷∈ : ∀ {a ws} → Bar ws → Bar (a ∷∈ ws)
-
-  bar-∷∈ (now g) = now (good-∷∈ g)
+  bar-∷∈ (now n) = now (good-∷∈ n)
   bar-∷∈ (later l) = later (bar-∷∈₁ l)
 
   bar-∷∈₁ : ∀ {a ws} → (∀ w → Bar (w ∷ ws)) → (∀ w → Bar (w ∷ a ∷∈ ws))
-
   bar-∷∈₁ {a} {ws} l [] = bar-[]∷ (a ∷∈ ws)
-  bar-∷∈₁ {a} {ws} l (b ∷ v) with b ≟ a
-  ... | yes b≡a rewrite b≡a =
+  bar-∷∈₁ {a} {ws} l (b ∷ v) with ≡⊎<> b a
+  ... | inj₁ b≡a  rewrite b≡a =
     Bar (a ∷∈ (v ∷ ws)) ∋
     bar-∷∈ (l v)
-  ... | no  b≢a =
+  ... | inj₂ b<>a =
     Bar ((b ∷ v) ∷ a ∷∈ ws) ∋
-    ttBar b≢a
-          (T b (v ∷ a ∷∈ ws) ((b ∷ v) ∷ a ∷∈ ws)
-            ∋ t-init b≢a)
-          (T a ws ((b ∷ v) ∷ a ∷∈ ws)
-            ∋ t-drop (b≢a ∘ sym) (t-∷∈ a ws))
-          (Bar (v ∷ a ∷∈ ws)
-            ∋ bar-∷∈₁ l v)
-          (Bar ws
-            ∋ later l)
-
+    ttBar b<>a tb ta (bar-∷∈₁ l v) (later l)
+    where tb : T b (v ∷ a ∷∈ ws) ((b ∷ v) ∷ a ∷∈ ws)
+          tb = t-init b<>a
+          ta : T a ws ((b ∷ v) ∷ a ∷∈ ws)
+          ta = t-drop (<>-sym $ b<>a) (t-∷∈ a ws)
 
 --
 -- higman: Main theorem
