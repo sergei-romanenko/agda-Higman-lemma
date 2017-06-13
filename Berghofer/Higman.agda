@@ -45,7 +45,7 @@ Seq = List Word
 -- Intuitively, a word `v` can be embedded into a word `w`,
 -- if we can obtain `v` by deleting letters from `w`.
 -- For example,
---   false ∷ true ∷ false ∷ true ∷ [] ⊵ true ∷ true ∷ []
+--   true ∷ true ∷ [] ⊴ false ∷ true ∷ false ∷ true ∷ []
 
 infix 4 _⊴_ _∋⊴_
 
@@ -169,9 +169,9 @@ bar-[]∷ ws = later (λ w → now (here (here ([]⊴ w))))
 ∋⊴-drop (here w⊴v) = here (⊴-drop w⊴v)
 ∋⊴-drop (there ws∋⊴v) = there (∋⊴-drop ws∋⊴v)
 
-∋⊴-∷∈ : ∀ {ws a v} → ws ∋⊴ v → a ∷∈ ws ∋⊴ a ∷ v
-∋⊴-∷∈ (here w⊴v) = here (⊴-keep w⊴v)
-∋⊴-∷∈ (there ws∋⊴v) = there (∋⊴-∷∈ ws∋⊴v)
+∋⊴-keep : ∀ {ws a v} → ws ∋⊴ v → a ∷∈ ws ∋⊴ a ∷ v
+∋⊴-keep (here w⊴v) = here (⊴-keep w⊴v)
+∋⊴-keep (there ws∋⊴v) = there (∋⊴-keep ws∋⊴v)
 
 t-∋⊴-drop : ∀ {a v vs ws} → T a vs ws → vs ∋⊴ v → ws ∋⊴ a ∷ v
 t-∋⊴-drop (t-init a<>b) (here ⊴v) = here (⊴-keep ⊴v)
@@ -184,7 +184,7 @@ t-∋⊴-drop t-[] ()
 -- Lemmas. Good ... → Good ...
 
 good-∷∈ : ∀ {a ws} → Good ws → Good (a ∷∈ ws)
-good-∷∈ (here ws∋⊴w) = here (∋⊴-∷∈ ws∋⊴w)
+good-∷∈ (here ws∋⊴w) = here (∋⊴-keep ws∋⊴w)
 good-∷∈ (there good-ws) = there (good-∷∈ good-ws)
 
 t-good : ∀ {a vs ws} → T a vs ws → Good vs → Good ws
@@ -209,31 +209,31 @@ t-∷∈ a (x ∷ xs) = t-keep (t-∷∈ a xs)
 
 mutual
 
-  ttBar : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
+  t-zip : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
             Bar xs → Bar ys → Bar zs
-  ttBar a<>b ta tb (now nx) bar-ys = now (t-good ta nx)
-  ttBar a<>b ta tb (later lx) bar-ys = ttBar₁ a<>b ta tb lx bar-ys
+  t-zip a<>b ta tb (now nx) bar-ys = now (t-good ta nx)
+  t-zip a<>b ta tb (later lx) bar-ys = t-zip₁ a<>b ta tb lx bar-ys
 
-  ttBar₁ : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
+  t-zip₁ : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
              (∀ w → Bar (w ∷ xs)) → Bar ys → Bar zs
-  ttBar₁ a<>b ta tb lx (now nx) = now (t-good tb nx)
-  ttBar₁ a<>b ta tb lx (later ly) = later (ttBar₂ a<>b ta tb lx ly)
+  t-zip₁ a<>b ta tb lx (now ny) = now (t-good tb ny)
+  t-zip₁ a<>b ta tb lx (later ly) = later (t-zip₂ a<>b ta tb lx ly)
 
-  ttBar₂ : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
+  t-zip₂ : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
              (∀ w → Bar (w ∷ xs)) → (∀ w → Bar (w ∷ ys)) →
              (∀ w → Bar (w ∷ zs))
-  ttBar₂ {zs} a<>b ta tb lx ly [] = bar-[]∷ zs
-  ttBar₂ {zs}  {a} {b} {xs} {ys} a<>b ta tb lx ly (c ∷ v) with dirichlet2 a<>b c
+  t-zip₂ {zs} a<>b ta tb lx ly [] = bar-[]∷ zs
+  t-zip₂ {zs} {a} {b} {xs} {ys} a<>b ta tb lx ly (c ∷ v) with dirichlet2 a<>b c
   ... | inj₁ c≡a rewrite c≡a =
     Bar ((a ∷ v) ∷ zs) ∋
-    ttBar a<>b ta′ tb′ (lx v) (later ly)
+    t-zip a<>b ta′ tb′ (lx v) (later ly)
     where ta′ : T a (v ∷ xs) ((a ∷ v) ∷ zs)
           ta′ = t-keep ta
           tb′ : T b ys ((a ∷ v) ∷ zs)
           tb′ = t-drop (<>-sym $ a<>b) tb
   ... | inj₂ c≡b rewrite c≡b =
     Bar ((b ∷ v) ∷ zs) ∋
-    ttBar₁ a<>b ta′ tb′ lx (ly v)
+    t-zip₁ a<>b ta′ tb′ lx (ly v)
     where ta′ : T a xs ((b ∷ v) ∷ zs)
           ta′ = t-drop a<>b ta
           tb′ : T b (v ∷ ys) ((b ∷ v) ∷ zs)
@@ -255,12 +255,12 @@ mutual
   bar-∷∈₁ : ∀ {a ws} → (∀ w → Bar (w ∷ ws)) → (∀ w → Bar (w ∷ a ∷∈ ws))
   bar-∷∈₁ {a} {ws} l [] = bar-[]∷ (a ∷∈ ws)
   bar-∷∈₁ {a} {ws} l (b ∷ v) with ≡⊎<> b a
-  ... | inj₁ b≡a  rewrite b≡a =
+  ... | inj₁ b≡a rewrite b≡a =
     Bar (a ∷∈ (v ∷ ws)) ∋
     bar-∷∈ (l v)
   ... | inj₂ b<>a =
     Bar ((b ∷ v) ∷ a ∷∈ ws) ∋
-    ttBar b<>a tb ta (bar-∷∈₁ l v) (later l)
+    t-zip b<>a tb ta (bar-∷∈₁ l v) (later l)
     where tb : T b (v ∷ a ∷∈ ws) ((b ∷ v) ∷ a ∷∈ ws)
           tb = t-init b<>a
           ta : T a ws ((b ∷ v) ∷ a ∷∈ ws)
