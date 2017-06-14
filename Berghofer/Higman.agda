@@ -18,7 +18,7 @@ open import Data.Nat
 open import Data.Bool
   using (Bool; true; false)
 open import Data.List as List
-  hiding (any; all)
+  using (List; []; _∷_; length)
 open import Data.Product as Prod
   using (_×_; _,_; proj₁; proj₂; Σ; ∃)
 open import Data.Sum as Sum
@@ -84,9 +84,14 @@ data Good : (ws : List Word) → Set where
 -- (1) the list of words ws is already good, or
 -- (2) successively adding words will turn it into a good list.
 
-data Bar : List Word → Set where
-  now   : ∀ {ws} (n : Good ws) → Bar ws
-  later : ∀ {ws} (l : ∀ w → Bar (w ∷ ws)) → Bar ws
+mutual
+
+  data Bar : List Word → Set where
+    now   : ∀ {ws} (n : Good ws) → Bar ws
+    later : ∀ {ws} (l : Later ws) → Bar ws
+
+  Later : Seq → Set
+  Later ws = ∀ w → Bar (w ∷ ws)
 
 -- Consequently,
 --   Bar []
@@ -139,13 +144,13 @@ dirichlet2 t<>f true  = inj₁ refl
 -- (2) then appending the tails of words starting with a.
 
 data T (a : Letter) : (vs ws : List Word) → Set where
-  t-init : ∀ {v ws b} → (a<>b : a <> b) →
-           T a (v ∷ b ∷∈ ws) ((a ∷ v) ∷ b ∷∈ ws)
-  t-keep : ∀ {v vs ws} →
-           (t : T a vs ws) → T a (v ∷ vs) ((a ∷ v) ∷ ws)
-  t-drop : ∀ {v vs ws b} → (a<>b : a <> b) →
-           (t : T a vs ws) → T a vs ((b ∷ v) ∷ ws)
-  t-[]   : T a [] []  -- This rule ensures that `T a ws (a ∷∈ ws)` for all `ws`.
+  init : ∀ {w ws b} (a<>b : a <> b) →
+           T a (w ∷ b ∷∈ ws) ((a ∷ w) ∷ b ∷∈ ws)
+  keep : ∀ {w vs ws} →
+           T a vs ws → T a (w ∷ vs) ((a ∷ w) ∷ ws)
+  drop : ∀ {w vs ws b} (a<>b : a <> b) →
+           T a vs ws → T a vs ((b ∷ w) ∷ ws)
+  []   : T a [] []  -- This rule ensures that `T a ws (a ∷∈ ws)`.
 
 --
 -- The proof of Higman’s lemma is divided into several parts, namely
@@ -160,8 +165,8 @@ data T (a : Letter) : (vs ws : List Word) → Set where
 -- by appending any word.
 --
 
-bar-[]∷ : (ws : List Word) → Bar ([] ∷ ws)
-bar-[]∷ ws = later (λ w → now (here (here ([]⊴ w))))
+bar[]∷ : (ws : List Word) → Bar ([] ∷ ws)
+bar[]∷ ws = later (λ w → now (here (here ([]⊴ w))))
 
 -- Lemmas. w ⊵∃ ... → (a ∷ w) ⊵∃ ...
 
@@ -174,32 +179,30 @@ bar-[]∷ ws = later (λ w → now (here (here ([]⊴ w))))
 ∋⊴-keep (there ws∋⊴v) = there (∋⊴-keep ws∋⊴v)
 
 t-∋⊴-drop : ∀ {a v vs ws} → T a vs ws → vs ∋⊴ v → ws ∋⊴ a ∷ v
-t-∋⊴-drop (t-init a<>b) (here ⊴v) = here (⊴-keep ⊴v)
-t-∋⊴-drop (t-init a<>b) (there ∋⊴v) = there (∋⊴-drop ∋⊴v)
-t-∋⊴-drop (t-keep t) (here ⊴v) = here (⊴-keep ⊴v)
-t-∋⊴-drop (t-keep t) (there ∋⊴v) = there (t-∋⊴-drop t ∋⊴v)
-t-∋⊴-drop (t-drop a<>b t) ∋⊴v = there (t-∋⊴-drop t ∋⊴v)
-t-∋⊴-drop t-[] ()
+t-∋⊴-drop (init a<>b) (here ⊴v) = here (⊴-keep ⊴v)
+t-∋⊴-drop (init a<>b) (there ∋⊴v) = there (∋⊴-drop ∋⊴v)
+t-∋⊴-drop (keep t) (here ⊴v) = here (⊴-keep ⊴v)
+t-∋⊴-drop (keep t) (there ∋⊴v) = there (t-∋⊴-drop t ∋⊴v)
+t-∋⊴-drop (drop a<>b t) ∋⊴v = there (t-∋⊴-drop t ∋⊴v)
 
 -- Lemmas. Good ... → Good ...
 
-good-∷∈ : ∀ {a ws} → Good ws → Good (a ∷∈ ws)
-good-∷∈ (here ws∋⊴w) = here (∋⊴-keep ws∋⊴w)
-good-∷∈ (there good-ws) = there (good-∷∈ good-ws)
+good∷ : ∀ {a ws} → Good ws → Good (a ∷∈ ws)
+good∷ (here ws∋⊴w) = here (∋⊴-keep ws∋⊴w)
+good∷ (there good-ws) = there (good∷ good-ws)
 
-t-good : ∀ {a vs ws} → T a vs ws → Good vs → Good ws
-t-good (t-init a<>b) (here b-ws∋⊴v) = here (∋⊴-drop b-ws∋⊴v)
-t-good (t-init a<>b) (there good-b-vs) = there good-b-vs
-t-good (t-keep t) (here vs∋⊴v) = here (t-∋⊴-drop t vs∋⊴v)
-t-good (t-keep t) (there good-vs) = there (t-good t good-vs)
-t-good (t-drop a<>b t) good-vs = there (t-good t good-vs)
-t-good t-[] ()
+good-t : ∀ {a vs ws} → T a vs ws → Good vs → Good ws
+good-t (init a<>b) (here b-ws∋⊴v) = here (∋⊴-drop b-ws∋⊴v)
+good-t (init a<>b) (there good-b-vs) = there good-b-vs
+good-t (keep t) (here vs∋⊴v) = here (t-∋⊴-drop t vs∋⊴v)
+good-t (keep t) (there good-vs) = there (good-t t good-vs)
+good-t (drop a<>b t) good-vs = there (good-t t good-vs)
 
 -- Lemma. T a (...) (a ∷∈ ...)
 
-t-∷∈ : ∀ a vs → T a vs (a ∷∈ vs)
-t-∷∈ a [] = t-[]
-t-∷∈ a (x ∷ xs) = t-keep (t-∷∈ a xs)
+t∷ : ∀ a ws → T a ws (a ∷∈ ws)
+t∷ a [] = []
+t∷ a (w ∷ ws) = keep (t∷ a ws)
 
 --
 -- prop2 : Interleaving two trees
@@ -209,35 +212,35 @@ t-∷∈ a (x ∷ xs) = t-keep (t-∷∈ a xs)
 
 mutual
 
-  t-zip : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
+  tt-bb : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
             Bar xs → Bar ys → Bar zs
-  t-zip a<>b ta tb (now nx) bar-ys = now (t-good ta nx)
-  t-zip a<>b ta tb (later lx) bar-ys = t-zip₁ a<>b ta tb lx bar-ys
+  tt-bb a<>b ta tb (now nx) bar-ys = now (good-t ta nx)
+  tt-bb a<>b ta tb (later lx) bar-ys = tt-lb a<>b ta tb lx bar-ys
 
-  t-zip₁ : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
-             (∀ w → Bar (w ∷ xs)) → Bar ys → Bar zs
-  t-zip₁ a<>b ta tb lx (now ny) = now (t-good tb ny)
-  t-zip₁ a<>b ta tb lx (later ly) = later (t-zip₂ a<>b ta tb lx ly)
+  tt-lb : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
+            Later xs → Bar ys → Bar zs
+  tt-lb a<>b ta tb lx (now ny) = now (good-t tb ny)
+  tt-lb a<>b ta tb lx (later ly) = later (tt-ll a<>b ta tb lx ly)
 
-  t-zip₂ : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
-             (∀ w → Bar (w ∷ xs)) → (∀ w → Bar (w ∷ ys)) →
-             (∀ w → Bar (w ∷ zs))
-  t-zip₂ {zs} a<>b ta tb lx ly [] = bar-[]∷ zs
-  t-zip₂ {zs} {a} {b} {xs} {ys} a<>b ta tb lx ly (c ∷ v) with dirichlet2 a<>b c
+  tt-ll : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
+            Later xs → Later ys → Later zs
+  tt-ll {zs} a<>b ta tb lx ly [] = bar[]∷ zs
+  tt-ll {zs} {a} {b} {xs} {ys} a<>b ta tb lx ly (c ∷ v)
+    with dirichlet2 a<>b c
   ... | inj₁ c≡a rewrite c≡a =
     Bar ((a ∷ v) ∷ zs) ∋
-    t-zip a<>b ta′ tb′ (lx v) (later ly)
+    tt-bb a<>b ta′ tb′ (lx v) (later ly)
     where ta′ : T a (v ∷ xs) ((a ∷ v) ∷ zs)
-          ta′ = t-keep ta
+          ta′ = keep ta
           tb′ : T b ys ((a ∷ v) ∷ zs)
-          tb′ = t-drop (<>-sym $ a<>b) tb
+          tb′ = drop (<>-sym $ a<>b) tb
   ... | inj₂ c≡b rewrite c≡b =
     Bar ((b ∷ v) ∷ zs) ∋
-    t-zip₁ a<>b ta′ tb′ lx (ly v)
+    tt-lb a<>b ta′ tb′ lx (ly v)
     where ta′ : T a xs ((b ∷ v) ∷ zs)
-          ta′ = t-drop a<>b ta
+          ta′ = drop a<>b ta
           tb′ : T b (v ∷ ys) ((b ∷ v) ∷ zs)
-          tb′ = t-keep tb
+          tb′ = keep tb
 
 
 --
@@ -248,31 +251,35 @@ mutual
 
 mutual
 
-  bar-∷∈ : ∀ {a ws} → Bar ws → Bar (a ∷∈ ws)
-  bar-∷∈ (now n) = now (good-∷∈ n)
-  bar-∷∈ (later l) = later (bar-∷∈₁ l)
+  bar∷ : ∀ a ws → Bar ws → Bar (a ∷∈ ws)
+  bar∷ a ws (now n) = now (good∷ n)
+  bar∷ a ws (later l) = later (bar∷l a ws l)
 
-  bar-∷∈₁ : ∀ {a ws} → (∀ w → Bar (w ∷ ws)) → (∀ w → Bar (w ∷ a ∷∈ ws))
-  bar-∷∈₁ {a} {ws} l [] = bar-[]∷ (a ∷∈ ws)
-  bar-∷∈₁ {a} {ws} l (b ∷ v) with ≡⊎<> b a
+  bar∷l : ∀ a ws → Later ws → Later (a ∷∈ ws)
+  bar∷l a ws l [] = bar[]∷ (a ∷∈ ws)
+  bar∷l a ws l (b ∷ w) with ≡⊎<> b a
   ... | inj₁ b≡a rewrite b≡a =
-    Bar (a ∷∈ (v ∷ ws)) ∋
-    bar-∷∈ (l v)
+    Bar (a ∷∈ w ∷ ws) ∋
+    bar∷ a (w ∷ ws) (l w)
   ... | inj₂ b<>a =
-    Bar ((b ∷ v) ∷ a ∷∈ ws) ∋
-    t-zip b<>a tb ta (bar-∷∈₁ l v) (later l)
-    where tb : T b (v ∷ a ∷∈ ws) ((b ∷ v) ∷ a ∷∈ ws)
-          tb = t-init b<>a
-          ta : T a ws ((b ∷ v) ∷ a ∷∈ ws)
-          ta = t-drop (<>-sym $ b<>a) (t-∷∈ a ws)
+    Bar ((b ∷ w) ∷ a ∷∈ ws) ∋
+    tt-bb b<>a t1 t2 b1 b2
+    where t1 : T b (w ∷ a ∷∈ ws) ((b ∷ w) ∷ a ∷∈ ws)
+          t1 = init b<>a
+          b1 : Bar (w ∷ a ∷∈ ws)
+          b1 = bar∷l a ws l w
+          t2 : T a ws ((b ∷ w) ∷ a ∷∈ ws)
+          t2 = drop (<>-sym $ b<>a) (t∷ a ws)
+          b2 : Bar ws
+          b2 = later l
 
 --
 -- higman: Main theorem
 --
 
-higman′ :  ∀ w → Bar (w ∷ [])
-higman′ [] = bar-[]∷ []
-higman′ (c ∷ cs) = bar-∷∈ (higman′ cs)
+higman′ :  Later []
+higman′ [] = bar[]∷ []
+higman′ (c ∷ cs) = bar∷ c (cs ∷ []) (higman′ cs)
 
 higman : Bar []
 higman = later higman′
