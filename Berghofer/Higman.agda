@@ -15,8 +15,6 @@ module Higman where
 
 open import Data.Nat
   using (ℕ; zero; suc)
-open import Data.Bool
-  using (Bool; true; false)
 open import Data.List as List
   using (List; []; _∷_; length)
 open import Data.Product as Prod
@@ -35,8 +33,8 @@ open import Relation.Binary.PropositionalEquality
 -- Words are modelled as lists of letters from
 -- the two letter alphabet.
 
-Letter : Set
-Letter = Bool
+data Letter : Set where
+  l0 l1 : Letter
 
 Word = List Letter
 Seq = List Word
@@ -45,7 +43,7 @@ Seq = List Word
 -- Intuitively, a word `v` can be embedded into a word `w`,
 -- if we can obtain `v` by deleting letters from `w`.
 -- For example,
---   true ∷ true ∷ [] ⊴ false ∷ true ∷ false ∷ true ∷ []
+--   l1 ∷ l0 ∷ l1 ∷ [] ⊴ l0 ∷ l1 ∷ l0 ∷ l0 ∷ l1 ∷ []
 
 infix 4 _⊴_ _∋⊴_
 
@@ -73,7 +71,7 @@ data _∋⊴_ : (ws : Seq) (v : Word) → Set where
 -- or contains a word which can be embedded into the word
 -- occurring at the head position of the list.
 
-data Good : (ws : List Word) → Set where
+data Good : (ws : Seq) → Set where
   here  : ∀ {ws w} (ws∋⊴w : ws ∋⊴ w) → Good (w ∷ ws)
   there : ∀ {ws w} (good-ws : Good ws) → Good (w ∷ ws)
 
@@ -86,7 +84,7 @@ data Good : (ws : List Word) → Set where
 
 mutual
 
-  data Bar : List Word → Set where
+  data Bar : Seq → Set where
     now   : ∀ {ws} (n : Good ws) → Bar ws
     later : ∀ {ws} (l : Later ws) → Bar ws
 
@@ -106,7 +104,7 @@ mutual
 
 infixr 5 _∷∈_
 
-_∷∈_ : (a : Letter) (ws : List Word) → List Word
+_∷∈_ : (a : Letter) (ws : Seq) → Seq
 a ∷∈ [] = []
 a ∷∈ w ∷ ws = (a ∷ w) ∷ a ∷∈ ws
 
@@ -115,35 +113,35 @@ a ∷∈ w ∷ ws = (a ∷ w) ∷ a ∷∈ ws
 infix 4 _<>_
 
 data _<>_ : (a b : Letter) → Set where
-  f<>t : false <> true
-  t<>f : true <> false
+  l0<>l1 : l0 <> l1
+  l1<>l0 : l1 <> l0
 
 <>-sym : ∀ {a b} → a <> b → b <> a
-<>-sym f<>t = t<>f
-<>-sym t<>f = f<>t
+<>-sym l0<>l1 = l1<>l0
+<>-sym l1<>l0 = l0<>l1
 
 ≡⊎<> : ∀ a b → a ≡ b ⊎ a <> b
-≡⊎<> false false = inj₁ refl
-≡⊎<> false true = inj₂ f<>t
-≡⊎<> true false = inj₂ t<>f
-≡⊎<> true true = inj₁ refl
+≡⊎<> l0 l0 = inj₁ refl
+≡⊎<> l0 l1 = inj₂ l0<>l1
+≡⊎<> l1 l0 = inj₂ l1<>l0
+≡⊎<> l1 l1 = inj₁ refl
 
 --
 -- Dirichlet's (pigeonhole) principle for 2 holes.
 --
 
 dirichlet2 : ∀ {a b} → a <> b → ∀ c → c ≡ a ⊎ c ≡ b
-dirichlet2 f<>t false = inj₁ refl
-dirichlet2 f<>t true  = inj₂ refl
-dirichlet2 t<>f false = inj₂ refl
-dirichlet2 t<>f true  = inj₁ refl
+dirichlet2 l0<>l1 l0 = inj₁ refl
+dirichlet2 l0<>l1 l1 = inj₂ refl
+dirichlet2 l1<>l0 l0 = inj₂ refl
+dirichlet2 l1<>l0 l1 = inj₁ refl
 
 -- `T a vs ws` means that vs is obtained from ws by
 -- (1) first copying the prefix of words starting with the letter b,
 --     where a ≢ b, and
 -- (2) then appending the tails of words starting with a.
 
-data T (a : Letter) : (vs ws : List Word) → Set where
+data T (a : Letter) : (vs ws : Seq) → Set where
   init : ∀ {w ws b} (a<>b : a <> b) →
            T a (w ∷ b ∷∈ ws) ((a ∷ w) ∷ b ∷∈ ws)
   keep : ∀ {w vs ws} →
@@ -165,7 +163,7 @@ data T (a : Letter) : (vs ws : List Word) → Set where
 -- by appending any word.
 --
 
-bar[]∷ : (ws : List Word) → Bar ([] ∷ ws)
+bar[]∷ : (ws : Seq) → Bar ([] ∷ ws)
 bar[]∷ ws = later (λ w → now (here (here ([]⊴ w))))
 
 -- Lemmas. w ⊵∃ ... → (a ∷ w) ⊵∃ ...
