@@ -25,8 +25,6 @@ open import Data.Sum as Sum
 open import Function
   using (_$_; _∋_)
 
-open import Relation.Nullary
-open import Relation.Binary
 open import Relation.Binary.PropositionalEquality
   renaming([_] to ≡[_])
 
@@ -189,12 +187,12 @@ good∷ : ∀ {a ws} → Good ws → Good (a ∷∈ ws)
 good∷ (here ws∋⊴w) = here (∋⊴-keep ws∋⊴w)
 good∷ (there good-ws) = there (good∷ good-ws)
 
-good-t : ∀ {a vs ws} → T a vs ws → Good vs → Good ws
-good-t (init a<>b) (here b-ws∋⊴v) = here (∋⊴-drop b-ws∋⊴v)
-good-t (init a<>b) (there good-b-vs) = there good-b-vs
-good-t (keep t) (here vs∋⊴v) = here (t-∋⊴-drop t vs∋⊴v)
-good-t (keep t) (there good-vs) = there (good-t t good-vs)
-good-t (drop a<>b t) good-vs = there (good-t t good-vs)
+t-good : ∀ {a vs ws} → T a vs ws → Good vs → Good ws
+t-good (init a<>b) (here b-ws∋⊴v) = here (∋⊴-drop b-ws∋⊴v)
+t-good (init a<>b) (there good-b-vs) = there good-b-vs
+t-good (keep t) (here vs∋⊴v) = here (t-∋⊴-drop t vs∋⊴v)
+t-good (keep t) (there good-vs) = there (t-good t good-vs)
+t-good (drop a<>b t) good-vs = there (t-good t good-vs)
 
 -- Lemma. T a (...) (a ∷∈ ...)
 
@@ -212,12 +210,12 @@ mutual
 
   tt-bb : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
             Bar xs → Bar ys → Bar zs
-  tt-bb a<>b ta tb (now nx) bar-ys = now (good-t ta nx)
+  tt-bb a<>b ta tb (now nx) bar-ys = now (t-good ta nx)
   tt-bb a<>b ta tb (later lx) bar-ys = tt-lb a<>b ta tb lx bar-ys
 
   tt-lb : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
             Later xs → Bar ys → Bar zs
-  tt-lb a<>b ta tb lx (now ny) = now (good-t tb ny)
+  tt-lb a<>b ta tb lx (now ny) = now (t-good tb ny)
   tt-lb a<>b ta tb lx (later ly) = later (tt-ll a<>b ta tb lx ly)
 
   tt-ll : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
@@ -231,7 +229,7 @@ mutual
     where ta′ : T a (v ∷ xs) ((a ∷ v) ∷ zs)
           ta′ = keep ta
           tb′ : T b ys ((a ∷ v) ∷ zs)
-          tb′ = drop (<>-sym $ a<>b) tb
+          tb′ = drop (<>-sym a<>b) tb
   ... | inj₂ c≡b rewrite c≡b =
     Bar ((b ∷ v) ∷ zs) ∋
     tt-lb a<>b ta′ tb′ lx (ly v)
@@ -246,28 +244,30 @@ mutual
 --
 -- Proof idea: Induction on Bar ws, then induction on first word following ws
 
-
 mutual
 
-  bar∷ : ∀ a ws → Bar ws → Bar (a ∷∈ ws)
-  bar∷ a ws (now n) = now (good∷ n)
-  bar∷ a ws (later l) = later (bar∷l a ws l)
+  bar∷ : ∀ b ws → Bar ws → Bar (b ∷∈ ws)
+  bar∷ b ws (now n) = now (good∷ n)
+  bar∷ b ws (later l) = later (bar∷l b ws l)
 
-  bar∷l : ∀ a ws → Later ws → Later (a ∷∈ ws)
-  bar∷l a ws l [] = bar[]∷ (a ∷∈ ws)
-  bar∷l a ws l (b ∷ w) with ≡⊎<> b a
-  ... | inj₁ b≡a rewrite b≡a =
-    Bar (a ∷∈ w ∷ ws) ∋
-    bar∷ a (w ∷ ws) (l w)
-  ... | inj₂ b<>a =
-    Bar ((b ∷ w) ∷ a ∷∈ ws) ∋
-    tt-bb b<>a t1 t2 b1 b2
-    where t1 : T b (w ∷ a ∷∈ ws) ((b ∷ w) ∷ a ∷∈ ws)
-          t1 = init b<>a
-          b1 : Bar (w ∷ a ∷∈ ws)
-          b1 = bar∷l a ws l w
-          t2 : T a ws ((b ∷ w) ∷ a ∷∈ ws)
-          t2 = drop (<>-sym $ b<>a) (t∷ a ws)
+  bar∷l : ∀ b ws → Later ws → Later (b ∷∈ ws)
+  bar∷l b ws l [] = bar[]∷ (b ∷∈ ws)
+  bar∷l b ws l (a ∷ w) with ≡⊎<> a b
+  ... | inj₁ a≡b rewrite a≡b =
+    Bar (b ∷∈ w ∷ ws) ∋
+    bar∷ b (w ∷ ws) (l w)
+  ... | inj₂ a<>b =
+    Bar zs ∋
+    tt-bb a<>b t1 t2 b1 b2
+    where zs = (a ∷ w) ∷ b ∷∈ ws
+          xs = w ∷ b ∷∈ ws
+          ys = ws
+          t1 : T a xs zs
+          t1 = init a<>b
+          b1 : Bar xs
+          b1 = bar∷l b ws l w
+          t2 : T b ws zs
+          t2 = drop (<>-sym a<>b) (t∷ b ws)
           b2 : Bar ws
           b2 = later l
 
