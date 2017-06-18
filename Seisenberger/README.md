@@ -1,4 +1,4 @@
-# A constructive proof of Higman’s lemma implemented in Agda
+# A constructive proof of Higman’s lemma formalized in Agda
 
 This proof in Agda is based on
 

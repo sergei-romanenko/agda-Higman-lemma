@@ -246,28 +246,26 @@ mutual
 
 mutual
 
-  bar∷ : ∀ b ws → Bar ws → Bar (b ∷∈ ws)
-  bar∷ b ws (now n) = now (good∷ n)
-  bar∷ b ws (later l) = later (bar∷l b ws l)
+  bar∷∈ : ∀ b ws → Bar ws → Bar (b ∷∈ ws)
+  bar∷∈ b ws (now n) = now (good∷ n)
+  bar∷∈ b ws (later l) = later (later∷∈ b ws l)
 
-  bar∷l : ∀ b ws → Later ws → Later (b ∷∈ ws)
-  bar∷l b ws l [] = bar[]∷ (b ∷∈ ws)
-  bar∷l b ws l (a ∷ w) with ≡⊎<> a b
+  later∷∈ : ∀ b ws → Later ws → Later (b ∷∈ ws)
+  later∷∈ b ws l [] = bar[]∷ (b ∷∈ ws)
+  later∷∈ b ws l (a ∷ w) with ≡⊎<> a b
   ... | inj₁ a≡b rewrite a≡b =
     Bar (b ∷∈ w ∷ ws) ∋
-    bar∷ b (w ∷ ws) (l w)
+    bar∷∈ b (w ∷ ws) (l w)
   ... | inj₂ a<>b =
     Bar zs ∋
     tt-bb a<>b t1 t2 b1 b2
     where zs = (a ∷ w) ∷ b ∷∈ ws
-          xs = w ∷ b ∷∈ ws
-          ys = ws
-          t1 : T a xs zs
+          t1 : T a (w ∷ b ∷∈ ws) zs
           t1 = init a<>b
-          b1 : Bar xs
-          b1 = bar∷l b ws l w
           t2 : T b ws zs
           t2 = drop (<>-sym a<>b) (t∷ b ws)
+          b1 : Bar (w ∷ b ∷∈ ws)
+          b1 = later∷∈ b ws l w
           b2 : Bar ws
           b2 = later l
 
@@ -275,39 +273,46 @@ mutual
 -- higman: Main theorem
 --
 
-higman′ :  Later []
-higman′ [] = bar[]∷ []
-higman′ (c ∷ cs) = bar∷ c (cs ∷ []) (higman′ cs)
+later[] :  Later []
+later[] [] = bar[]∷ []
+later[] (c ∷ w) = bar∷∈ c (w ∷ []) (later[] w)
 
-higman : Bar []
-higman = later higman′
+bar[] : Bar []
+bar[] = later later[]
+
+bar∷ : ∀ w ws → Bar ws → Bar (w ∷ ws)
+bar∷ w ws (now n) = now (there n)
+bar∷ w ws (later l) = l w
+
+higman : ∀ ws → Bar ws
+higman [] = bar[]
+higman (w ∷ ws) = bar∷ w ws (higman ws)
 
 
 --
 -- good-prefix-lemma
 --
 
-data Is-prefix {A : Set} (f : ℕ → A) : List A → Set where
-  zero : Is-prefix f []
+data Prefix {A : Set} (f : ℕ → A) : List A → Set where
+  zero : Prefix f []
   suc  : ∀ {xs : List A} →
-        Is-prefix f xs → Is-prefix f (f (length xs) ∷ xs)
+         Prefix f xs → Prefix f (f (length xs) ∷ xs)
 
-test-is-prefix : Is-prefix (λ k → suc (suc k)) (4 ∷ 3 ∷ 2 ∷ [])
-test-is-prefix = suc (suc (suc zero))
+private
+  test-prefix : Prefix (λ k → suc (suc k)) (4 ∷ 3 ∷ 2 ∷ [])
+  test-prefix = suc (suc (suc zero))
 
-good-prefix-lemma :
-  ∀ (f : ℕ → Word) ws →
-    Bar ws → Is-prefix f ws →
-    ∃ λ vs → Is-prefix f vs × Good vs
-good-prefix-lemma f ws (now g) p =
-  ws , p , g
-good-prefix-lemma f ws (later l) p =
+good-prefix′ :
+  ∀ (f : ℕ → Word) ws → Bar ws → Prefix f ws →
+    ∃ λ vs → Prefix f vs × Good vs
+good-prefix′ f ws (now n) p =
+  ws , p , n
+good-prefix′ f ws (later l) p =
   let w = f (length ws)
-  in good-prefix-lemma f (w ∷ ws) (l w) (suc p)
+  in good-prefix′ f (w ∷ ws) (l w) (suc p)
 
 -- Finding good prefixes of infinite sequences
 
 good-prefix :
-  ∀ (f : ℕ → Word) →
-    ∃ λ ws → (Is-prefix f ws × Good ws)
-good-prefix f = good-prefix-lemma f [] higman zero
+  ∀ (f : ℕ → Word) → ∃ λ ws → (Prefix f ws × Good ws)
+good-prefix f = good-prefix′ f [] bar[] zero

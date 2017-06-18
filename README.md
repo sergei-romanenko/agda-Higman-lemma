@@ -1,4 +1,4 @@
-# Constructive proofs of Higman’s lemma implemented in Agda
+# Constructive proofs of Higman’s lemma formalized in Agda
 
 ## Folders
 
