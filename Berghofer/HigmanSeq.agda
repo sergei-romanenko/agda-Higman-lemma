@@ -170,8 +170,8 @@ data T (a : Letter) : (vs ws : Seq) → Set where
 -- by appending any word.
 --
 
-bar[]∷ : (ws : Seq) → Bar (ws # [])
-bar[]∷ ws = later (λ w → now (here (here ([]⊴ w))))
+bar-#[] : (ws : Seq) → Bar (ws # [])
+bar-#[] ws = later (λ w → now (here (here ([]⊴ w))))
 
 -- Lemmas. w ⊵∃ ... → (a ∷ w) ⊵∃ ...
 
@@ -229,7 +229,7 @@ mutual
 
   tt-ll : ∀ {zs a b xs ys} → a <> b → T a xs zs → T b ys zs →
             Later xs → Later ys → Later zs
-  tt-ll {zs} a<>b ta tb lx ly [] = bar[]∷ zs
+  tt-ll {zs} a<>b ta tb lx ly [] = bar-#[] zs
   tt-ll {zs} {a} {b} {xs} {ys} a<>b ta tb lx ly (c ∷ v)
     with dirichlet2 a<>b c
   ... | inj₁ c≡a rewrite c≡a =
@@ -260,7 +260,7 @@ mutual
   bar∷∈ b ws (later l) = later (later∷∈ b ws l)
 
   later∷∈ : ∀ b ws → Later ws → Later (b ∷∈ ws)
-  later∷∈ b ws l [] = bar[]∷ (b ∷∈ ws)
+  later∷∈ b ws l [] = bar-#[] (b ∷∈ ws)
   later∷∈ b ws l (a ∷ w) with ≡⊎<> a b
   ... | inj₁ a≡b rewrite a≡b =
     Bar (b ∷∈ (ws # w)) ∋
@@ -283,7 +283,7 @@ mutual
 --
 
 later-ε :  Later ε
-later-ε [] = bar[]∷ ε
+later-ε [] = bar-#[] ε
 later-ε (c ∷ w) = bar∷∈ c (ε # w) (later-ε w)
 
 bar-ε : Bar ε
