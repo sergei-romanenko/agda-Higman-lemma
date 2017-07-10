@@ -74,8 +74,8 @@ data ε≢ : Seq → Set where
 -- means that ws contains a word w, such that w ⊴ v .
 
 data _∋⊴_ : (ws : Seq) (v : Word) → Set where
-   here  : ∀ {w ws v} (w⊴v : w ⊴ v) → (ws # w) ∋⊴ v
-   there : ∀ {w ws v} (ws∋⊴v : ws ∋⊴ v) → (ws # w) ∋⊴ v
+  here  : ∀ {w ws v} (w⊴v : w ⊴ v) → (ws # w) ∋⊴ v
+  there : ∀ {w ws v} (ws∋⊴v : ws ∋⊴ v) → (ws # w) ∋⊴ v
 
 -- A list of words is good if its tail is either good
 -- or contains a word which can be embedded into the word
@@ -207,11 +207,11 @@ t-good (drop a<>b t) good-vs = there (t-good t good-vs)
 
 -- Lemma. T a (...) (a ∷∈ ...)
 
-t∷∈ : ∀ a ws → ε≢ ws → T a ws (a ∷∈ ws)
-t∷∈ a ε ()
-t∷∈ l0 (ε # v) nε = init l0<>l1
-t∷∈ l1 (ε # v) nε = init l1<>l0
-t∷∈ a (ws # w # v) nε = keep (t∷∈ a (ws # w) ε≢#)
+t-ε≢ : ∀ a ws → ε≢ ws → T a ws (a ∷∈ ws)
+t-ε≢ a ε ()
+t-ε≢ l0 (ε # v) nε = init l0<>l1
+t-ε≢ l1 (ε # v) nε = init l1<>l0
+t-ε≢ a (ws # w # v) nε = keep (t-ε≢ a (ws # w) ε≢#)
 
 --
 -- prop2 : Interleaving two trees
@@ -271,7 +271,8 @@ mutual
   ... | inj₂ a<>b =
     bar∷∈-a b ws a w a<>b ε≢ws l
 
-  bar∷∈-b : ∀ b ws w → ε≢ ws → Later ws → Bar (b ∷∈ (ws # w))
+  bar∷∈-b : ∀ b ws w → ε≢ ws →
+    Later ws → Bar (b ∷∈ (ws # w))
   bar∷∈-b b ws w ε≢ws l =
     bar∷∈ b (ws # w) ε≢# (l w)
 
@@ -284,7 +285,7 @@ mutual
           b1 : Bar ((b ∷∈ ws) # w)
           b1 = later∷∈ b ws ε≢ws l w
           t2 : T b ws ((b ∷∈ ws) # (a ∷ w))
-          t2 = drop (<>-sym a<>b) (t∷∈ b ws ε≢ws)
+          t2 = drop (<>-sym a<>b) (t-ε≢ b ws ε≢ws)
           b2 : Bar ws
           b2 = later l
 
