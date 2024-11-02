@@ -4,10 +4,10 @@ open import Data.Nat as Nat
   using (ℕ; zero; suc)
 open import Data.List as List
   hiding (any; all)
-open import Data.List.All as All
+open import Data.List.Relation.Unary.All
   using (All; []; _∷_)
-open import Data.List.Any as Any
-  using (Any; here; there; any; module Membership; module Membership-≡)
+open import Data.List.Relation.Unary.Any
+  using (Any; here; there; any{- ; module Membership; module Membership-≡ -})
 open import Data.Product as Prod
   using (_×_; _,_; proj₁; proj₂; Σ; ∃; ∃₂; uncurry)
 open import Data.Sum as Sum
@@ -194,10 +194,10 @@ module HigmanFin (n : ℕ) where
   -- The countdown data structure can be used to keep track of (an upper
   -- bound of) the number of available fresh letters.
 
-  isDecEquivalence : IsDecEquivalence _≡_
-  isDecEquivalence = DecSetoid.isDecEquivalence (P.decSetoid (_≟_ {n}))
+  isDecEquivalence-n : IsDecEquivalence _≡_
+  isDecEquivalence-n = DecSetoid.isDecEquivalence (P.decSetoid (_≟_ {n}))
 
-  open  Countdown (record { isDecEquivalence = isDecEquivalence })
+  open  Countdown (record { isDecEquivalence = isDecEquivalence-n})
 
   allFinList : List (Fin n)
   allFinList = Vec.toList (Vec.allFin n)

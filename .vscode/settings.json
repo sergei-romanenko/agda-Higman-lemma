@@ -1,0 +1,7 @@
+{
+    "editor.unicodeHighlight.allowedCharacters": {
+        "×": true,
+        "′": true,
+        "ℕ": true
+    }
+}

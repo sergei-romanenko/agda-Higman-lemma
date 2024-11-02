@@ -13,7 +13,7 @@ module HigmanFinite
   (_≟_ : (a b : Letter) → Dec (a ≡ b))
   where
 
-{-
+{- 
 module HigmanFinite where
 
 postulate
@@ -26,10 +26,11 @@ open import Level
 
 open import Data.List as List
   hiding (any; all)
-open import Data.List.All as All
+open import Data.List.Membership.Propositional
+open import Data.List.Relation.Unary.All
   using (All; []; _∷_)
-open import Data.List.Any as Any
-  using (Any; here; there; any; module Membership; module Membership-≡)
+open import Data.List.Relation.Unary.Any
+  using (Any; here; there; any?)
 open import Data.Product as Prod
   using (_×_; _,_; proj₁; proj₂; Σ)
 open import Data.Sum as Sum
@@ -46,12 +47,10 @@ open import Relation.Nullary
 -- Membership
 --
 
-open Membership-≡
-
 infix 4 _∈?_
 
 _∈?_ : (a : Letter) (as : List Letter) → Dec (a ∈ as)
-a ∈? as = any (_≟_ a) as
+a ∈? as = any? (_≟_ a) as
 
 --
 -- `GoodW as`: `as` is "good" if there is a repeated letter.

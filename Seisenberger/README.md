@@ -15,8 +15,8 @@ Computer Science and Statistics
 
 This version is compatible with
 
-* Agda 2.5.2
-* The Standard Library 0.13
+* Agda 2.6.2
+* The Standard Library 1.7
 
 Note that the implementation in Agda is complete. Namely, it contains
 a proof of the lemma **`good∈folder→good`**. This lemma corresponds to
@@ -80,4 +80,3 @@ the idea of *proofs as data*, as explained in
 
 Constructively, if we have a proof telling that something appears in
 a container, this proof explains how to actually get this thing.
-

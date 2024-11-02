@@ -7,3 +7,10 @@ This version is produced by rewriting the proof presented in
   Springer Verlag, 2004.
 
 from Isabelle to Agda.
+
+---
+
+This version is compatible with
+
+* Agda 2.6.2
+* The Standard Library 1.7

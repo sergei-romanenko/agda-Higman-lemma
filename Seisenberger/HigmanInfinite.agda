@@ -26,12 +26,12 @@ postulate
 
 open import Data.List as List
   hiding (any; all; tails)
-open import Data.List.All as All
-  using (All; []; _∷_)
-open import Data.List.Any as Any
-  using (Any; here; there; any; index; module Membership-≡)
+open import Data.List.Relation.Unary.All
+  using ([]; _∷_)
+open import Data.List.Relation.Unary.Any
+  using (Any; here; there; any?)
 open import Data.Product as Prod
-  using (_×_; _,_; proj₁; proj₂; ∃; ∃₂)
+  using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum as Sum
   using (_⊎_; inj₁; inj₂)
 open import Data.Empty
@@ -54,7 +54,7 @@ _≥∃_ : (a : A) (as : List A) → Set
 a ≥∃ as = Any (_≥_ a) as
 
 _≥∃?_ : (a : A) (as : List A) → Dec (a ≥∃ as)
-a ≥∃? as = any (_≥?_ a) as
+a ≥∃? as = any? (_≥?_ a) as
 
 --
 -- `GoodW as`: `as` is "good" if there is a repeated letter.
