@@ -13,11 +13,6 @@ Springer-Verlag, London, UK, 233-242.
 Dissertation, LMU München: Faculty of Mathematics,
 Computer Science and Statistics 
 
-This version is compatible with
-
-* Agda 2.6.2
-* The Standard Library 1.7
-
 Note that the implementation in Agda is complete. Namely, it contains
 a proof of the lemma **`good∈folder→good`**. This lemma corresponds to
 Lemma 5.7i in Seisenberger's thesis (where it is just assumed to be
